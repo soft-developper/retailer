@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: retailer-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: npm install -g bun && bun install
+    startCommand: bun run server/index.ts
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: CIRCLE_ENTITY_SECRET
+        sync: false
+      - key: TURSO_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: VITE_FX_API_KEY
+        sync: false
+      - key: ONRAMP_API_BASE_URL
+        value: https://api-test.circle.com
+      - key: VITE_ONRAMP_WIDGET_BASE_URL
+        value: https://onramp-sandbox.arc.io
+      - key: ONRAMP_REFERRER_DOMAIN
+        sync: false

@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --canvas: #FAFAF8;
+    --card: rgba(255, 255, 255, 0.85);
+    --navy: #0F172A;
+    --navy-muted: #334155;
+    --accent: #2563EB;
+    --success: #16A34A;
+    --error: #DC2626;
+    --border: rgba(15, 23, 42, 0.08);
+  }
+
+  html {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background-color: var(--canvas);
+    color: var(--navy);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, .display {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .mono {
+    font-family: 'JetBrains Mono', 'Menlo', monospace;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  min-height: 100dvh;
+}
