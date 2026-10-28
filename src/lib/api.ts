@@ -12,6 +12,7 @@ export interface Merchant {
   circle_wallet_id?: string
   fx_rate_override?: number | null
   created_at?: string
+  token?: string // returned by login/register, stored in localStorage
 }
 
 export interface Product {
@@ -64,12 +65,23 @@ export interface Transaction {
 
 const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '/api'
 
+const TOKEN_KEY = 'retailer_jwt'
+export const tokenStore = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = tokenStore.get()
+  const headers: Record<string, string> = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${base}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
-    credentials: 'include', // send httpOnly cookies cross-origin
+    credentials: 'include', // also send cookie for same-origin dev
   })
   if (!res.ok) {
     const text = await res.text()
@@ -80,11 +92,20 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const api = {
   // Auth
-  register: (body: { name: string; email: string; password: string; category: string; local_currency: string }) =>
-    req<Merchant>('POST', '/auth/register', body),
-  login: (body: { email: string; password: string }) =>
-    req<Merchant>('POST', '/auth/login', body),
-  logout: () => req<{ ok: boolean }>('POST', '/auth/logout'),
+  register: async (body: { name: string; email: string; password: string; category: string; local_currency: string }) => {
+    const m = await req<Merchant>('POST', '/auth/register', body)
+    if (m.token) tokenStore.set(m.token)
+    return m
+  },
+  login: async (body: { email: string; password: string }) => {
+    const m = await req<Merchant>('POST', '/auth/login', body)
+    if (m.token) tokenStore.set(m.token)
+    return m
+  },
+  logout: async () => {
+    tokenStore.clear()
+    return req<{ ok: boolean }>('POST', '/auth/logout')
+  },
   me: () => req<Merchant>('GET', '/auth/me'),
 
   // Merchants (public read — used by checkout)

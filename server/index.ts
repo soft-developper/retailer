@@ -142,8 +142,16 @@ function setAuthCookie(res: express.Response, token: string) {
   })
 }
 
-function getMerchantIdFromCookie(req: express.Request): string | null {
-  const token = req.cookies?.[COOKIE_NAME] as string | undefined
+function getTokenFromRequest(req: express.Request): string | null {
+  // 1. Bearer token in Authorization header (works cross-origin, used by production)
+  const auth = req.headers.authorization
+  if (auth?.startsWith('Bearer ')) return auth.slice(7)
+  // 2. httpOnly cookie fallback (works in same-origin dev)
+  return (req.cookies?.[COOKIE_NAME] as string | undefined) ?? null
+}
+
+function getMerchantIdFromRequest(req: express.Request): string | null {
+  const token = getTokenFromRequest(req)
   if (!token) return null
   try {
     const payload = jwt.verify(token, JWT_SECRET!) as { sub: string }
@@ -152,7 +160,7 @@ function getMerchantIdFromCookie(req: express.Request): string | null {
 }
 
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const merchantId = getMerchantIdFromCookie(req)
+  const merchantId = getMerchantIdFromRequest(req)
   if (!merchantId) { res.status(401).json({ error: 'Unauthorized' }); return }
   ;(req as express.Request & { merchantId: string }).merchantId = merchantId
   next()
@@ -365,7 +373,7 @@ app.post('/auth/register', registerLimiter, async (req, res) => {
 
     const token = signToken(id)
     setAuthCookie(res, token)
-    res.status(201).json({ id, name: name.trim(), email: email.trim().toLowerCase(), category, local_currency: local_currency ?? 'USD', arc_wallet_address: wallet.address })
+    res.status(201).json({ id, name: name.trim(), email: email.trim().toLowerCase(), category, local_currency: local_currency ?? 'USD', arc_wallet_address: wallet.address, token })
   } catch (err) {
     console.error('POST /auth/register error:', err)
     // M-2: pass through user-facing messages, hide everything else
@@ -396,7 +404,7 @@ app.post('/auth/login', authLimiter, async (req, res) => {
 
     const token = signToken(stored.id)
     setAuthCookie(res, token)
-    res.json({ id: stored.id, name: stored.name, email: stored.email, category: stored.category, local_currency: stored.local_currency, arc_wallet_address: stored.arc_wallet_address, fx_rate_override: stored.fx_rate_override })
+    res.json({ id: stored.id, name: stored.name, email: stored.email, category: stored.category, local_currency: stored.local_currency, arc_wallet_address: stored.arc_wallet_address, fx_rate_override: stored.fx_rate_override, token })
   } catch (err) {
     console.error('POST /auth/login error:', err)
     res.status(500).json({ error: 'Login failed. Please try again.' })
@@ -409,7 +417,7 @@ app.post('/auth/logout', (_req, res) => {
 })
 
 app.get('/auth/me', async (req, res) => {
-  const merchantId = getMerchantIdFromCookie(req)
+  const merchantId = getMerchantIdFromRequest(req)
   if (!merchantId) return res.status(401).json({ error: 'Not logged in' })
   try {
     const row = await db.execute({ sql: 'SELECT id, name, email, category, local_currency, arc_wallet_address, fx_rate_override, created_at FROM merchants WHERE id = ?', args: [merchantId] })
