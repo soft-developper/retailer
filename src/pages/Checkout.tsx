@@ -171,6 +171,10 @@ export default function Checkout() {
 
   function handlePay() {
     if (!merchant || amount <= 0) return
+    if (!RETAILER_PAYMENTS_ADDRESS) {
+      console.error('VITE_RETAILER_PAYMENTS_ADDRESS is not set — cannot process payment')
+      return
+    }
     if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_CHAIN_ID }); return }
     resetApprove()
     resetPay()
