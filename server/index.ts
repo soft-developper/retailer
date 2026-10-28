@@ -362,15 +362,25 @@ app.get('/merchants/:id/transactions', async (req, res) => {
 
 // ── Onramp ────────────────────────────────────────────────────────────────────
 
+// Strip any scheme/path from ONRAMP_REFERRER_DOMAIN so a value like
+// "https://retailer-psi.vercel.app/" doesn't crash the SDK at startup.
+// The SDK requires a bare hostname (e.g. "retailer-psi.vercel.app") or undefined.
+function parseReferrerDomain(raw: string | undefined): string | undefined {
+  if (!raw) return undefined
+  try {
+    const host = new URL(raw.includes('://') ? raw : `https://${raw}`).hostname
+    return host || undefined
+  } catch {
+    return undefined
+  }
+}
+
 const onrampServer = createAppServerKit({
   onramp: {
     apiKey: process.env.CIRCLE_API_KEY!,
-    // sandbox: api-test.circle.com — omit for production (defaults to api.circle.com)
     baseUrl: process.env.ONRAMP_API_BASE_URL,
-    // widget origin — must match the client. Use VITE_ prefix so it's available in browser too.
     widgetBaseUrl: process.env.VITE_ONRAMP_WIDGET_BASE_URL,
-    // bare hostname matching KYB for embedded card payments (not enforced in sandbox)
-    referrerDomain: process.env.ONRAMP_REFERRER_DOMAIN,
+    referrerDomain: parseReferrerDomain(process.env.ONRAMP_REFERRER_DOMAIN),
   },
 })
 
