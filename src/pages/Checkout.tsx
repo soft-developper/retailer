@@ -7,19 +7,17 @@ import { arcTestnet } from 'viem/chains'
 import { ShoppingBag, ShieldCheck, AlertCircle } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { api, type Merchant, type CheckoutSession } from '../lib/api'
+
 const ARC_TESTNET_CHAIN_ID = arcTestnet.id
 const PLATFORM_FEE_USDC = 0.01
 const ESTIMATED_GAS_USDC = 0.001
+const USDC_DECIMALS = 6
 
 const RETAILER_PAYMENTS_ADDRESS = (import.meta.env.VITE_RETAILER_PAYMENTS_ADDRESS ?? '') as `0x${string}`
+const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as `0x${string}`
 
 // ABI inlined — no dependency on Foundry build output
 const RETAILER_PAYMENTS_ABI = [
-  {
-    type: 'constructor',
-    inputs: [{ name: '_usdc', type: 'address', internalType: 'address' }],
-    stateMutability: 'nonpayable',
-  },
   {
     type: 'function',
     name: 'pay',
@@ -31,30 +29,27 @@ const RETAILER_PAYMENTS_ABI = [
     outputs: [],
     stateMutability: 'nonpayable',
   },
-  {
-    type: 'event',
-    name: 'PaymentReceived',
-    inputs: [
-      { name: 'merchant', type: 'address', indexed: true, internalType: 'address' },
-      { name: 'payer', type: 'address', indexed: true, internalType: 'address' },
-      { name: 'sessionId', type: 'bytes32', indexed: true, internalType: 'bytes32' },
-      { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
-    ],
-    anonymous: false,
-  },
-  { type: 'error', name: 'ZeroAddress', inputs: [] },
-  { type: 'error', name: 'ZeroAmount', inputs: [] },
-  { type: 'error', name: 'ZeroSessionId', inputs: [] },
-  { type: 'error', name: 'TransferFailed', inputs: [] },
 ] as const
 
-// Encode sessionId string → bytes32
+const ERC20_APPROVE_ABI = [
+  {
+    type: 'function',
+    name: 'approve',
+    inputs: [
+      { name: 'spender', type: 'address', internalType: 'address' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool', internalType: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+] as const
+
+// Payment state machine
+type PayStep = 'idle' | 'approving' | 'approved' | 'paying' | 'confirming' | 'done'
+
 function toBytes32(s: string): `0x${string}` {
   return keccak256(toBytes(s))
 }
-
-// USDC decimals on Arc
-const USDC_DECIMALS = 6
 
 export default function Checkout() {
   const [params] = useSearchParams()
@@ -69,12 +64,34 @@ export default function Checkout() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [manualAmount, setManualAmount] = useState('')
-  const [confirming, setConfirming] = useState(false)
+  const [payStep, setPayStep] = useState<PayStep>('idle')
 
   const { address, chainId, isConnected } = useAccount()
   const { switchChain } = useSwitchChain()
-  const { writeContract, data: txHash, isPending, error: writeError } = useWriteContract()
-  const { isLoading: isConfirming, isSuccess, data: receipt } = useWaitForTransactionReceipt({ hash: txHash })
+
+  // Step 1: approve
+  const {
+    writeContract: writeApprove,
+    data: approveTxHash,
+    isPending: isApprovePending,
+    error: approveError,
+    reset: resetApprove,
+  } = useWriteContract()
+
+  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } =
+    useWaitForTransactionReceipt({ hash: approveTxHash })
+
+  // Step 2: pay
+  const {
+    writeContract: writePay,
+    data: payTxHash,
+    isPending: isPayPending,
+    error: payError,
+    reset: resetPay,
+  } = useWriteContract()
+
+  const { isLoading: isPayConfirming, isSuccess: isPaySuccess, data: payReceipt } =
+    useWaitForTransactionReceipt({ hash: payTxHash })
 
   const isWrongChain = isConnected && chainId !== ARC_TESTNET_CHAIN_ID
 
@@ -87,10 +104,7 @@ export default function Checkout() {
         setMerchant(m)
         if (sessionId) {
           const s = await api.getSession(sessionId)
-          if (s.status === 'CONFIRMED') {
-            void navigate('/pay-confirmed?already=true')
-            return
-          }
+          if (s.status === 'CONFIRMED') { void navigate('/pay-confirmed?already=true'); return }
           if (s.status === 'EXPIRED') {
             setError('This payment link has expired. Ask the merchant for a new one.')
             return
@@ -105,16 +119,33 @@ export default function Checkout() {
     })()
   }, [merchantId, sessionId, navigate])
 
-  // After on-chain receipt confirmed, record in DB
+  // Step 1 → 2: when approve is mined, send the pay tx
   useEffect(() => {
-    if (!isSuccess || !receipt || confirming) return
-    setConfirming(true)
-    const sid = session?.id ?? sessionId
+    if (!isApproveSuccess || payStep !== 'approving') return
+    setPayStep('approved')
+    const sid = session?.id ?? sessionId ?? 'open'
+    const raw = parseUnits(amountUsdc().toFixed(6), USDC_DECIMALS)
+    writePay({
+      address: RETAILER_PAYMENTS_ADDRESS,
+      abi: RETAILER_PAYMENTS_ABI,
+      functionName: 'pay',
+      args: [merchant!.arc_wallet_address as `0x${string}`, toBytes32(sid), raw],
+      chainId: ARC_TESTNET_CHAIN_ID,
+    })
+    setPayStep('paying')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isApproveSuccess])
+
+  // Step 2 done: record in DB and navigate
+  useEffect(() => {
+    if (!isPaySuccess || !payReceipt || payStep === 'done') return
+    setPayStep('done')
     void (async () => {
       try {
+        const sid = session?.id ?? sessionId
         if (sid) {
           await api.confirmSession(sid, {
-            tx_hash: receipt.transactionHash,
+            tx_hash: payReceipt.transactionHash,
             from_address: address ?? '',
             network_fee_usdc: ESTIMATED_GAS_USDC,
             platform_fee_usdc: PLATFORM_FEE_USDC,
@@ -123,11 +154,48 @@ export default function Checkout() {
       } catch (err) {
         console.error('record confirmation error:', err)
       } finally {
-        // Navigate regardless — payment succeeded on-chain
-        void navigate(`/pay-confirmed?tx=${receipt.transactionHash}&merchant=${merchantId}`)
+        void navigate(`/pay-confirmed?tx=${payReceipt.transactionHash}&merchant=${merchantId}`)
       }
     })()
-  }, [isSuccess, receipt, session, sessionId, address, merchantId, navigate, confirming])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaySuccess, payReceipt])
+
+  function amountUsdc(): number {
+    if (session) return session.amount_usdc
+    if (amountParam) return parseFloat(amountParam)
+    return parseFloat(manualAmount || '0')
+  }
+
+  const amount = amountUsdc()
+  const totalUsdc = amount + ESTIMATED_GAS_USDC + PLATFORM_FEE_USDC
+
+  function handlePay() {
+    if (!merchant || amount <= 0) return
+    if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_CHAIN_ID }); return }
+    resetApprove()
+    resetPay()
+    setPayStep('approving')
+    const raw = parseUnits(amount.toFixed(6), USDC_DECIMALS)
+    // Step 1: approve RetailerPayments to spend the USDC amount
+    writeApprove({
+      address: USDC_ADDRESS,
+      abi: ERC20_APPROVE_ABI,
+      functionName: 'approve',
+      args: [RETAILER_PAYMENTS_ADDRESS, raw],
+      chainId: ARC_TESTNET_CHAIN_ID,
+    })
+  }
+
+  function handleRetry() {
+    resetApprove()
+    resetPay()
+    setPayStep('idle')
+  }
+
+  const catIcons: Record<string, string> = {
+    groceries: '🛒', food: '🍽️', transport: '🚌',
+    clothing: '👕', services: '🔧', retail: '🏪', health: '💊', other: '📦',
+  }
 
   if (loading) {
     return (
@@ -153,38 +221,22 @@ export default function Checkout() {
 
   if (!merchant) return null
 
-  const amountUsdc = session
-    ? session.amount_usdc
-    : amountParam
-    ? parseFloat(amountParam)
-    : parseFloat(manualAmount || '0')
+  const anyError = approveError ?? payError
+  const isBusy = isApprovePending || isApproveConfirming || isPayPending || isPayConfirming || payStep === 'done'
 
-  const totalUsdc = amountUsdc + ESTIMATED_GAS_USDC + PLATFORM_FEE_USDC
-
-  function handlePay() {
-    if (!merchant || amountUsdc <= 0) return
-    if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_CHAIN_ID }); return }
-
-    const sid = session?.id ?? sessionId ?? 'open'
-    const raw = parseUnits(amountUsdc.toFixed(6), USDC_DECIMALS)
-
-    writeContract({
-      address: RETAILER_PAYMENTS_ADDRESS,
-      abi: RETAILER_PAYMENTS_ABI,
-      functionName: 'pay',
-      args: [merchant.arc_wallet_address as `0x${string}`, toBytes32(sid), raw],
-      chainId: ARC_TESTNET_CHAIN_ID,
-    })
-  }
-
-  const catIcons: Record<string, string> = {
-    groceries: '🛒', food: '🍽️', transport: '🚌',
-    clothing: '👕', services: '🔧', retail: '🏪', health: '💊', other: '📦',
+  // Status label for the busy state
+  function busyLabel(): string {
+    if (isApprovePending) return 'Confirm approval in your wallet…'
+    if (isApproveConfirming) return 'Approving USDC spend…'
+    if (isPayPending) return 'Confirm payment in your wallet…'
+    if (isPayConfirming || payStep === 'done') return 'Verifying on Arc…'
+    return 'Processing…'
   }
 
   return (
     <div className="min-h-dvh bg-[#FAFAF8] flex flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm space-y-4">
+
         {/* Merchant card */}
         <div className="bg-white/90 border border-[rgba(15,23,42,0.06)] rounded-2xl p-5 shadow-sm">
           <div className="flex items-center gap-3">
@@ -210,10 +262,7 @@ export default function Checkout() {
               <p className="text-xs font-medium text-[#64748b] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>
                 Amount to pay
               </p>
-              <p
-                className="text-4xl font-bold text-[#0F172A] tabular-nums"
-                style={{ fontFamily: 'Space Grotesk', letterSpacing: '-0.03em' }}
-              >
+              <p className="text-4xl font-bold text-[#0F172A] tabular-nums" style={{ fontFamily: 'Space Grotesk', letterSpacing: '-0.03em' }}>
                 {session.amount_usdc.toFixed(2)}
                 <span className="text-xl text-[#94a3b8] ml-2 font-medium">USDC</span>
               </p>
@@ -228,10 +277,7 @@ export default function Checkout() {
               <p className="text-xs font-medium text-[#64748b] uppercase mb-2" style={{ letterSpacing: '0.06em' }}>
                 Amount to pay
               </p>
-              <p
-                className="text-4xl font-bold text-[#0F172A] tabular-nums"
-                style={{ fontFamily: 'Space Grotesk', letterSpacing: '-0.03em' }}
-              >
+              <p className="text-4xl font-bold text-[#0F172A] tabular-nums" style={{ fontFamily: 'Space Grotesk', letterSpacing: '-0.03em' }}>
                 {parseFloat(amountParam).toFixed(2)}
                 <span className="text-xl text-[#94a3b8] ml-2 font-medium">USDC</span>
               </p>
@@ -258,14 +304,12 @@ export default function Checkout() {
         </div>
 
         {/* Fee breakdown */}
-        {amountUsdc > 0 && (
+        {amount > 0 && (
           <div className="bg-white/90 border border-[rgba(15,23,42,0.06)] rounded-2xl p-5 shadow-sm space-y-2.5">
-            <p className="text-xs font-semibold text-[#334155] uppercase" style={{ letterSpacing: '0.06em' }}>
-              Breakdown
-            </p>
+            <p className="text-xs font-semibold text-[#334155] uppercase" style={{ letterSpacing: '0.06em' }}>Breakdown</p>
             <div className="flex justify-between text-sm">
               <span className="text-[#64748b]">To merchant</span>
-              <span className="font-medium text-[#0F172A] tabular-nums">{amountUsdc.toFixed(2)} USDC</span>
+              <span className="font-medium text-[#0F172A] tabular-nums">{amount.toFixed(2)} USDC</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-[#64748b]">Network fee (Arc gas)</span>
@@ -278,6 +322,30 @@ export default function Checkout() {
             <div className="border-t border-[rgba(15,23,42,0.06)] pt-2.5 flex justify-between">
               <span className="text-sm font-semibold text-[#0F172A]">Total you pay</span>
               <span className="text-sm font-bold text-[#0F172A] tabular-nums">{totalUsdc.toFixed(3)} USDC</span>
+            </div>
+          </div>
+        )}
+
+        {/* Two-step progress indicator — shown while processing */}
+        {payStep !== 'idle' && (
+          <div className="bg-[#F8FAFF] border border-[#BFDBFE] rounded-2xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                isApproveSuccess ? 'bg-[#16A34A] text-white' : 'bg-[#2563EB] text-white'
+              }`}>1</div>
+              <span className={`text-sm font-medium ${isApproveSuccess ? 'text-[#16A34A]' : 'text-[#2563EB]'}`}>
+                {isApproveSuccess ? 'Approved ✓' : 'Approving USDC…'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                isPaySuccess ? 'bg-[#16A34A] text-white' : isApproveSuccess ? 'bg-[#2563EB] text-white' : 'bg-[#CBD5E1] text-[#64748b]'
+              }`}>2</div>
+              <span className={`text-sm font-medium ${
+                isPaySuccess ? 'text-[#16A34A]' : isApproveSuccess ? 'text-[#2563EB]' : 'text-[#94a3b8]'
+              }`}>
+                {isPaySuccess ? 'Payment sent ✓' : 'Send payment'}
+              </span>
             </div>
           </div>
         )}
@@ -295,32 +363,35 @@ export default function Checkout() {
             >
               Switch to Arc Testnet to continue
             </button>
-          ) : isPending ? (
+          ) : isBusy ? (
             <div className="w-full py-4 rounded-xl bg-[#0F172A] text-white font-semibold text-sm flex items-center justify-center gap-2">
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Confirm in your wallet…
-            </div>
-          ) : isConfirming || confirming ? (
-            <div className="w-full py-4 rounded-xl bg-[#EFF6FF] text-[#1d4ed8] font-semibold text-sm flex items-center justify-center gap-2 border border-[#BFDBFE]">
-              <span className="w-4 h-4 border-2 border-[#93c5fd] border-t-[#2563EB] rounded-full animate-spin" />
-              Verifying on Arc…
+              {busyLabel()}
             </div>
           ) : (
             <button
               onClick={handlePay}
-              disabled={amountUsdc <= 0}
+              disabled={amount <= 0}
               className="w-full py-4 rounded-xl bg-[#0F172A] text-white font-semibold text-sm disabled:opacity-40 hover:bg-[#1e293b] transition-colors"
             >
-              Pay {amountUsdc > 0 ? `${totalUsdc.toFixed(3)} USDC` : ''}
+              Pay {amount > 0 ? `${totalUsdc.toFixed(3)} USDC` : ''}
             </button>
           )}
 
-          {writeError && (
-            <p className="text-xs text-[#DC2626] text-center px-2">
-              {writeError.message.includes('User rejected')
-                ? 'Payment cancelled.'
-                : 'Transaction failed. Please try again.'}
-            </p>
+          {anyError && payStep !== 'done' && (
+            <div className="space-y-2">
+              <p className="text-xs text-[#DC2626] text-center px-2">
+                {anyError.message.includes('User rejected')
+                  ? 'Payment cancelled.'
+                  : 'Transaction failed. Please try again.'}
+              </p>
+              <button
+                onClick={handleRetry}
+                className="w-full py-3 rounded-xl bg-white border border-[rgba(15,23,42,0.12)] text-[#0F172A] font-semibold text-sm hover:bg-[#F8FAFF] transition-colors"
+              >
+                Try again
+              </button>
+            </div>
           )}
         </div>
 
