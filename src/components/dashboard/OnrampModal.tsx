@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppKit, KitError } from '@circle-fin/app-kit'
+import { AppKit } from '@circle-fin/app-kit'
 import type { OnrampSession } from '@circle-fin/app-kit'
 import { X, Loader2, AlertCircle, ExternalLink } from 'lucide-react'
+import { api } from '../../lib/api'
 
 // Widget origin must match server's VITE_ONRAMP_WIDGET_BASE_URL
 const WIDGET_BASE_URL = import.meta.env.VITE_ONRAMP_WIDGET_BASE_URL as string | undefined
@@ -14,9 +15,9 @@ interface Props {
   onClose: () => void
 }
 
-// Popup mode: fetch session eagerly, then open the widget window synchronously on click.
-// The sandbox widget sets frame-ancestors CSP that blocks non-allowlisted origins from
-// embedding it in an iframe — popup bypasses that restriction entirely.
+// Popup mode: fetch session eagerly via our POST endpoint, then open the widget
+// window synchronously on click. kit.onramp.fetchSession sends GET — unusable here
+// because our route is POST. We call api.createOnrampSession directly instead.
 export default function OnrampModal({ merchantId, walletAddress, onClose }: Props) {
   const [phase, setPhase] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
@@ -27,22 +28,17 @@ export default function OnrampModal({ merchantId, walletAddress, onClose }: Prop
     setPhase('loading')
     setErrorMsg('')
     try {
-      const session = await kit.onramp.fetchSession({
-        url: '/api/onramp/sessions',
-        body: {
-          appUserId: merchantId,
-          destinationAddress: walletAddress,
-          ...({ merchant_id: merchantId, destination_address: walletAddress } as Record<string, unknown>),
-        },
-      })
+      const raw = await api.createOnrampSession(merchantId, walletAddress)
+      // Map our API response to the OnrampSession shape the SDK expects
+      const session: OnrampSession = {
+        sessionId: raw.sessionId,
+        sessionToken: raw.sessionToken,
+        expiresAt: raw.expiresAt ?? new Date(Date.now() + 25 * 60 * 1000).toISOString(),
+      }
       sessionRef.current = session
       setPhase('ready')
     } catch (err) {
-      if (err instanceof KitError) {
-        setErrorMsg(`Could not prepare onramp session: ${err.message}`)
-      } else {
-        setErrorMsg('Could not prepare onramp session. Please try again.')
-      }
+      setErrorMsg(err instanceof Error ? err.message : 'Could not prepare onramp session. Please try again.')
       setPhase('error')
     }
   }
