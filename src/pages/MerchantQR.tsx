@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { Download, ArrowLeft, RefreshCw, Copy, Check, Plus, Minus, ShoppingCart } from 'lucide-react'
-import { api, type Merchant, type Product } from '../lib/api'
+import { api, type Merchant, type Product, type SessionProduct } from '../lib/api'
 import { getCurrentMerchantId } from '../lib/merchantStore'
 import { buildShareLink } from '../lib/share'
 import Sidebar from '../components/ui/Sidebar'
@@ -92,12 +92,22 @@ export default function MerchantQR() {
         return
       }
 
+      const sessionProducts: SessionProduct[] = hasCart
+        ? cartItems.map(p => ({
+            product_id: p.id,
+            quantity: p.qty,
+            name: p.name,
+            unit_price_local: p.local_price,
+          }))
+        : []
+
       const session = await api.createSession({
         merchant_id: merchantId,
         amount_usdc: amountUsdc,
         amount_local: amountLocal,
         currency: merchant.local_currency,
         fx_rate: fxRate,
+        session_products: sessionProducts.length > 0 ? sessionProducts : undefined,
       })
       const url = await buildShareLink(
         `/checkout?merchant=${merchantId}&session=${session.id}&amount=${amountUsdc.toFixed(6)}`,

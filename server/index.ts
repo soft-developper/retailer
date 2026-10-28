@@ -119,6 +119,8 @@ async function initDb() {
   try {
     await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_hash ON transactions(tx_hash) WHERE tx_hash IS NOT NULL')
   } catch { /* exists */ }
+  // Add session_products column for cart tracking
+  try { await db.execute('ALTER TABLE checkout_sessions ADD COLUMN session_products TEXT') } catch { /* exists */ }
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
@@ -510,8 +512,9 @@ app.delete('/products/:id', requireAuth, async (req, res) => {
 // H-2: validate merchant exists + amount_usdc > 0
 app.post('/sessions', async (req, res) => {
   try {
-    const { merchant_id, amount_usdc, amount_local, currency, fx_rate } = req.body as {
+    const { merchant_id, amount_usdc, amount_local, currency, fx_rate, session_products } = req.body as {
       merchant_id: string; amount_usdc: number; amount_local?: number; currency?: string; fx_rate?: number
+      session_products?: Array<{ product_id: string; quantity: number; name: string; unit_price_local: number }>
     }
     if (!merchant_id || typeof amount_usdc !== 'number' || amount_usdc <= 0) {
       return res.status(400).json({ error: 'merchant_id and a positive amount_usdc are required' })
@@ -522,9 +525,10 @@ app.post('/sessions', async (req, res) => {
     const id = crypto.randomUUID()
     const idempotency_key = crypto.randomUUID()
     const expires_at = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    const productsJson = session_products?.length ? JSON.stringify(session_products) : null
     await db.execute({
-      sql: `INSERT INTO checkout_sessions (id, merchant_id, amount_usdc, amount_local, currency, fx_rate, idempotency_key, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [id, merchant_id, amount_usdc, amount_local ?? null, currency ?? null, fx_rate ?? null, idempotency_key, expires_at],
+      sql: `INSERT INTO checkout_sessions (id, merchant_id, amount_usdc, amount_local, currency, fx_rate, idempotency_key, expires_at, session_products) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, merchant_id, amount_usdc, amount_local ?? null, currency ?? null, fx_rate ?? null, idempotency_key, expires_at, productsJson],
     })
     res.json({ id, merchant_id, amount_usdc, expires_at })
   } catch (err) {
@@ -584,6 +588,24 @@ app.post('/sessions/:id/confirm', async (req, res) => {
       args: [crypto.randomUUID(), txId, network_fee_usdc ?? 0, crypto.randomUUID(), txId, platform_fee_usdc ?? 0],
     })
     await db.execute({ sql: `UPDATE checkout_sessions SET status = 'CONFIRMED' WHERE id = ?`, args: [session.id] })
+
+    // Increment units_sold for each product in the cart
+    const fullSession = await db.execute({ sql: 'SELECT session_products FROM checkout_sessions WHERE id = ?', args: [session.id] })
+    const productsJson = fullSession.rows[0]?.session_products as string | null
+    if (productsJson) {
+      try {
+        const items = JSON.parse(productsJson) as Array<{ product_id: string; quantity: number }>
+        for (const item of items) {
+          if (item.product_id && item.quantity > 0) {
+            await db.execute({
+              sql: 'UPDATE products SET units_sold = units_sold + ? WHERE id = ?',
+              args: [item.quantity, item.product_id],
+            })
+          }
+        }
+      } catch { /* malformed json — skip */ }
+    }
+
     res.json({ ok: true, transaction_id: txId })
   } catch (err) {
     console.error('POST /sessions/:id/confirm error:', err)

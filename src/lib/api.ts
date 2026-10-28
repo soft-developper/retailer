@@ -25,6 +25,13 @@ export interface Product {
   created_at: string
 }
 
+export interface SessionProduct {
+  product_id: string
+  quantity: number
+  name: string
+  unit_price_local: number
+}
+
 export interface CheckoutSession {
   id: string
   merchant_id: string
@@ -92,7 +99,7 @@ export const api = {
   deleteProduct: (id: string) => req<{ ok: boolean }>('DELETE', `/products/${id}`),
 
   // Sessions
-  createSession: (body: { merchant_id: string; amount_usdc: number; amount_local?: number; currency?: string; fx_rate?: number }) =>
+  createSession: (body: { merchant_id: string; amount_usdc: number; amount_local?: number; currency?: string; fx_rate?: number; session_products?: SessionProduct[] }) =>
     req<CheckoutSession>('POST', '/sessions', body),
   getSession: (id: string) => req<CheckoutSession>('GET', `/sessions/${id}`),
   confirmSession: (id: string, body: { tx_hash: string; from_address: string; network_fee_usdc: number; platform_fee_usdc: number }) =>
