@@ -7,14 +7,46 @@ import { arcTestnet } from 'viem/chains'
 import { ShoppingBag, ShieldCheck, AlertCircle } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { api, type Merchant, type CheckoutSession } from '../lib/api'
-import retailerPaymentsArtifact from '../../contracts/out/RetailerPayments.sol/RetailerPayments.json'
-
 const ARC_TESTNET_CHAIN_ID = arcTestnet.id
 const PLATFORM_FEE_USDC = 0.01
 const ESTIMATED_GAS_USDC = 0.001
 
 const RETAILER_PAYMENTS_ADDRESS = (import.meta.env.VITE_RETAILER_PAYMENTS_ADDRESS ?? '') as `0x${string}`
-const RETAILER_PAYMENTS_ABI = retailerPaymentsArtifact.abi
+
+// ABI inlined — no dependency on Foundry build output
+const RETAILER_PAYMENTS_ABI = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_usdc', type: 'address', internalType: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'pay',
+    inputs: [
+      { name: 'merchant', type: 'address', internalType: 'address' },
+      { name: 'sessionId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    name: 'PaymentReceived',
+    inputs: [
+      { name: 'merchant', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'payer', type: 'address', indexed: true, internalType: 'address' },
+      { name: 'sessionId', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
+    ],
+    anonymous: false,
+  },
+  { type: 'error', name: 'ZeroAddress', inputs: [] },
+  { type: 'error', name: 'ZeroAmount', inputs: [] },
+  { type: 'error', name: 'ZeroSessionId', inputs: [] },
+  { type: 'error', name: 'TransferFailed', inputs: [] },
+] as const
 
 // Encode sessionId string → bytes32
 function toBytes32(s: string): `0x${string}` {
