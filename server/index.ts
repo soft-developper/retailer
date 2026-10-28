@@ -125,7 +125,8 @@ async function initDb() {
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
 const COOKIE_NAME = 'retailer_token'
-const IS_PROD = process.env.NODE_ENV === 'production'
+// Render sets RENDER=true; also honour NODE_ENV=production
+const IS_PROD = process.env.NODE_ENV === 'production' || process.env.RENDER === 'true'
 
 function signToken(merchantId: string): string {
   return jwt.sign({ sub: merchantId }, JWT_SECRET!, { expiresIn: '30d' })
