@@ -7,6 +7,24 @@ import { createAppServerKit, KitError } from '@circle-fin/app-kit/server'
 const app = express()
 app.use(express.json())
 
+// CORS — allow the Vercel frontend and the Arc Studio preview
+const ALLOWED_ORIGINS = new Set([
+  'https://retailer-psi.vercel.app',
+  // Arc Studio preview (local dev)
+  'https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io',
+])
+app.use((req, res, next) => {
+  const origin = req.headers.origin
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Vary', 'Origin')
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+  if (req.method === 'OPTIONS') { res.sendStatus(204); return }
+  next()
+})
+
 // ── DB ────────────────────────────────────────────────────────────────────────
 const db = createClient({
   url: process.env.TURSO_URL!,
