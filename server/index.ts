@@ -6,16 +6,33 @@ import { createAppServerKit, KitError } from '@circle-fin/app-kit/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import cookieParser from 'cookie-parser'
+import rateLimit from 'express-rate-limit'
+import { createPublicClient, http, parseAbi, decodeEventLog } from 'viem'
+import { arcTestnet } from 'viem/chains'
+
+// ── L-1: require JWT_SECRET at startup — no insecure fallback ─────────────────
+const JWT_SECRET = process.env.JWT_SECRET
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET env var is not set. Refusing to start.')
+  process.exit(1)
+}
 
 const app = express()
 app.use(express.json())
 app.use(cookieParser())
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
-const ALLOWED_ORIGINS = new Set([
-  'https://retailer-psi.vercel.app',
-  'https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io',
-])
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .concat([
+      'https://retailer-psi.vercel.app',
+      'https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io',
+    ])
+)
+
 app.use((req, res, next) => {
   const origin = req.headers.origin
   if (origin && ALLOWED_ORIGINS.has(origin)) {
@@ -76,7 +93,7 @@ async function initDb() {
       id TEXT PRIMARY KEY,
       session_id TEXT,
       merchant_id TEXT NOT NULL,
-      tx_hash TEXT,
+      tx_hash TEXT UNIQUE,
       amount_usdc REAL NOT NULL,
       network_fee_usdc REAL,
       platform_fee_usdc REAL,
@@ -93,22 +110,23 @@ async function initDb() {
       recorded_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `)
-  // Add columns to existing databases that predate auth
+  // Migrate pre-auth databases
   const cols = ['email TEXT', 'password_hash TEXT']
   for (const col of cols) {
-    try {
-      await db.execute(`ALTER TABLE merchants ADD COLUMN ${col}`)
-    } catch { /* column already exists */ }
+    try { await db.execute(`ALTER TABLE merchants ADD COLUMN ${col}`) } catch { /* exists */ }
   }
+  // Ensure tx_hash unique index on existing DBs
+  try {
+    await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_hash ON transactions(tx_hash) WHERE tx_hash IS NOT NULL')
+  } catch { /* exists */ }
 }
 
 // ── JWT helpers ───────────────────────────────────────────────────────────────
-const JWT_SECRET = process.env.JWT_SECRET ?? 'retailer-dev-secret-change-in-production'
 const COOKIE_NAME = 'retailer_token'
 const IS_PROD = process.env.NODE_ENV === 'production'
 
 function signToken(merchantId: string): string {
-  return jwt.sign({ sub: merchantId }, JWT_SECRET, { expiresIn: '30d' })
+  return jwt.sign({ sub: merchantId }, JWT_SECRET!, { expiresIn: '30d' })
 }
 
 function setAuthCookie(res: express.Response, token: string) {
@@ -116,7 +134,7 @@ function setAuthCookie(res: express.Response, token: string) {
     httpOnly: true,
     secure: IS_PROD,
     sameSite: IS_PROD ? 'none' : 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    maxAge: 30 * 24 * 60 * 60 * 1000,
     path: '/',
   })
 }
@@ -125,14 +143,11 @@ function getMerchantIdFromCookie(req: express.Request): string | null {
   const token = req.cookies?.[COOKIE_NAME] as string | undefined
   if (!token) return null
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { sub: string }
+    const payload = jwt.verify(token, JWT_SECRET!) as { sub: string }
     return payload.sub
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-// Auth middleware — attaches merchantId to req if valid cookie present
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const merchantId = getMerchantIdFromCookie(req)
   if (!merchantId) { res.status(401).json({ error: 'Unauthorized' }); return }
@@ -140,7 +155,72 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   next()
 }
 
+// ── C-1: onchain USDC transfer verifier ───────────────────────────────────────
+// RPC URL from env — set by the proxy or by RENDER/production env vars.
+// USDC_ADDRESS must be set in .env — never hardcoded.
+const ARC_RPC_URL = process.env.ARC_RPC_URL
+if (!ARC_RPC_URL) {
+  console.warn('[startup] ARC_RPC_URL not set — onchain verification will fail')
+}
+
+const USDC_CONTRACT = (process.env.USDC_ADDRESS ?? '') as `0x${string}`
+if (!USDC_CONTRACT) {
+  console.warn('[startup] USDC_ADDRESS not set — onchain verification will fail')
+}
+
+const TRANSFER_ABI = parseAbi(['event Transfer(address indexed from, address indexed to, uint256 value)'])
+
+const publicClient = createPublicClient({
+  chain: arcTestnet,
+  transport: http(ARC_RPC_URL ?? ''),
+})
+
+interface VerifyResult {
+  ok: boolean
+  fromAddress: string
+  amountUsdc: number
+  error?: string
+}
+
+async function verifyUsdcTransfer(
+  txHash: `0x${string}`,
+  expectedTo: string,
+  expectedAmountUsdc: number
+): Promise<VerifyResult> {
+  if (!ARC_RPC_URL || !USDC_CONTRACT) {
+    return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Onchain verification not configured' }
+  }
+  const receipt = await publicClient.getTransactionReceipt({ hash: txHash })
+  if (!receipt) return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Transaction not found' }
+  if (receipt.status !== 'success') return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Transaction reverted' }
+
+  const logs = receipt.logs.filter(
+    l => l.address.toLowerCase() === USDC_CONTRACT.toLowerCase()
+  )
+
+  for (const log of logs) {
+    try {
+      const { args } = decodeEventLog({ abi: TRANSFER_ABI, data: log.data, topics: log.topics })
+      if (!args) continue
+      const { from, to, value } = args as { from: string; to: string; value: bigint }
+      if (to.toLowerCase() !== expectedTo.toLowerCase()) continue
+      // USDC has 6 decimals
+      const amountUsdc = Number(value) / 1_000_000
+      // Allow up to 0.005 USDC tolerance for rounding
+      if (Math.abs(amountUsdc - expectedAmountUsdc) > 0.005) {
+        return { ok: false, fromAddress: from, amountUsdc, error: `Amount mismatch: got ${amountUsdc} USDC, expected ${expectedAmountUsdc}` }
+      }
+      return { ok: true, fromAddress: from, amountUsdc }
+    } catch { continue }
+  }
+
+  return { ok: false, fromAddress: '', amountUsdc: 0, error: 'No matching USDC Transfer event found' }
+}
+
 // ── Circle Wallets ─────────────────────────────────────────────────────────────
+// C-2: ARC_BLOCKCHAIN is env-driven — 'ARC-TESTNET' for testnet, 'ARC' for mainnet
+const ARC_BLOCKCHAIN = process.env.ARC_BLOCKCHAIN ?? 'ARC-TESTNET'
+
 let _circleClient: ReturnType<typeof initiateDeveloperControlledWalletsClient> | null = null
 
 function getCircleClient() {
@@ -186,10 +266,26 @@ async function warmUpCircle() {
   }
 }
 
+// ── M-1: rate limiters ────────────────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again in 15 minutes.' },
+})
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registrations from this IP. Please try again later.' },
+})
+
 // ── Auth routes ───────────────────────────────────────────────────────────────
 
-// POST /auth/register — create account + provision wallet
-app.post('/auth/register', async (req, res) => {
+app.post('/auth/register', registerLimiter, async (req, res) => {
   try {
     const { name, email, password, category, local_currency } = req.body as {
       name: string; email: string; password: string; category: string; local_currency?: string
@@ -199,14 +295,12 @@ app.post('/auth/register', async (req, res) => {
     }
     if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
 
-    // Check email not already registered
     const existing = await db.execute({ sql: 'SELECT id FROM merchants WHERE LOWER(email) = LOWER(?)', args: [email.trim()] })
     if (existing.rows.length) return res.status(409).json({ error: 'An account with this email already exists' })
 
     const password_hash = await bcrypt.hash(password, 12)
     const id = crypto.randomUUID()
 
-    // Provision Circle developer-controlled wallet
     const circle = getCircleClient()
     const ciphertext1 = await circle.generateEntitySecretCiphertext()
     const { default: axios } = await import('axios')
@@ -218,19 +312,19 @@ app.post('/auth/register', async (req, res) => {
       { idempotencyKey: crypto.randomUUID(), name: `r-${id.slice(0, 8)}`, entitySecretCiphertext: ciphertext1 },
       { headers: circleHeaders, validateStatus: () => true }
     )
-    if (wsRaw.status !== 201 && wsRaw.status !== 200) throw new Error(`Wallet set failed: ${wsRaw.data?.message ?? wsRaw.status}`)
+    if (wsRaw.status !== 201 && wsRaw.status !== 200) throw new Error('Wallet provisioning failed. Please try again.')
     const walletSetId = (wsRaw.data?.data?.walletSet?.id ?? wsRaw.data?.walletSet?.id) as string | undefined
-    if (!walletSetId) throw new Error('Failed to create wallet set')
+    if (!walletSetId) throw new Error('Wallet provisioning failed. Please try again.')
 
     const ciphertext2 = await circle.generateEntitySecretCiphertext()
     const wallRaw = await axios.post(
       'https://api.circle.com/v1/w3s/developer/wallets',
-      { idempotencyKey: crypto.randomUUID(), blockchains: ['ARC-TESTNET'], count: 1, walletSetId, entitySecretCiphertext: ciphertext2 },
+      { idempotencyKey: crypto.randomUUID(), blockchains: [ARC_BLOCKCHAIN], count: 1, walletSetId, entitySecretCiphertext: ciphertext2 },
       { headers: circleHeaders, validateStatus: () => true }
     )
-    if (wallRaw.status !== 201 && wallRaw.status !== 200) throw new Error(`Wallet failed: ${wallRaw.data?.message ?? wallRaw.status}`)
+    if (wallRaw.status !== 201 && wallRaw.status !== 200) throw new Error('Wallet provisioning failed. Please try again.')
     const walletData = wallRaw.data?.data?.wallets?.[0] ?? wallRaw.data?.wallets?.[0]
-    if (!walletData?.address) throw new Error('Failed to create wallet')
+    if (!walletData?.address) throw new Error('Wallet provisioning failed. Please try again.')
     const wallet = walletData as { id: string; address: string }
 
     await db.execute({
@@ -244,40 +338,46 @@ app.post('/auth/register', async (req, res) => {
     res.status(201).json({ id, name: name.trim(), email: email.trim().toLowerCase(), category, local_currency: local_currency ?? 'USD', arc_wallet_address: wallet.address })
   } catch (err) {
     console.error('POST /auth/register error:', err)
-    res.status(500).json({ error: String((err as Error).message) })
+    // M-2: pass through user-facing messages, hide everything else
+    const msg = (err as Error).message
+    const safeMessages = new Set([
+      'name, email, password and category are required',
+      'Password must be at least 8 characters',
+      'An account with this email already exists',
+      'Wallet provisioning failed. Please try again.',
+    ])
+    const status = msg === 'An account with this email already exists' ? 409 : 500
+    res.status(status).json({ error: safeMessages.has(msg) ? msg : 'Could not create your account. Please try again.' })
   }
 })
 
-// POST /auth/login
-app.post('/auth/login', async (req, res) => {
+app.post('/auth/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body as { email: string; password: string }
     if (!email || !password) return res.status(400).json({ error: 'email and password required' })
 
     const row = await db.execute({ sql: 'SELECT * FROM merchants WHERE LOWER(email) = LOWER(?)', args: [email.trim()] })
-    if (!row.rows.length) return res.status(401).json({ error: 'Invalid email or password' })
+    // Always hash to prevent timing-based user enumeration
+    const dummyHash = '$2a$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    const stored = row.rows[0] as { id: string; name: string; email: string; password_hash: string; category: string; local_currency: string; arc_wallet_address: string; fx_rate_override: number | null } | undefined
+    const hashToCheck = stored?.password_hash ?? dummyHash
+    const valid = await bcrypt.compare(password, hashToCheck)
+    if (!stored || !valid) return res.status(401).json({ error: 'Invalid email or password' })
 
-    const merchant = row.rows[0] as { id: string; name: string; email: string; password_hash: string; category: string; local_currency: string; arc_wallet_address: string; fx_rate_override: number | null }
-    if (!merchant.password_hash) return res.status(401).json({ error: 'This account was created before passwords were added. Please contact support.' })
-
-    const valid = await bcrypt.compare(password, merchant.password_hash)
-    if (!valid) return res.status(401).json({ error: 'Invalid email or password' })
-
-    const token = signToken(merchant.id)
+    const token = signToken(stored.id)
     setAuthCookie(res, token)
-    res.json({ id: merchant.id, name: merchant.name, email: merchant.email, category: merchant.category, local_currency: merchant.local_currency, arc_wallet_address: merchant.arc_wallet_address, fx_rate_override: merchant.fx_rate_override })
+    res.json({ id: stored.id, name: stored.name, email: stored.email, category: stored.category, local_currency: stored.local_currency, arc_wallet_address: stored.arc_wallet_address, fx_rate_override: stored.fx_rate_override })
   } catch (err) {
-    res.status(500).json({ error: String((err as Error).message) })
+    console.error('POST /auth/login error:', err)
+    res.status(500).json({ error: 'Login failed. Please try again.' })
   }
 })
 
-// POST /auth/logout
 app.post('/auth/logout', (_req, res) => {
   res.clearCookie(COOKIE_NAME, { path: '/', sameSite: IS_PROD ? 'none' : 'lax', secure: IS_PROD })
   res.json({ ok: true })
 })
 
-// GET /auth/me — returns the logged-in merchant (used on app load to restore session)
 app.get('/auth/me', async (req, res) => {
   const merchantId = getMerchantIdFromCookie(req)
   if (!merchantId) return res.status(401).json({ error: 'Not logged in' })
@@ -286,7 +386,8 @@ app.get('/auth/me', async (req, res) => {
     if (!row.rows.length) return res.status(404).json({ error: 'Merchant not found' })
     res.json(row.rows[0])
   } catch (err) {
-    res.status(500).json({ error: String((err as Error).message) })
+    console.error('GET /auth/me error:', err)
+    res.status(500).json({ error: 'Session check failed.' })
   }
 })
 
@@ -303,7 +404,6 @@ app.get('/fx/:currency', async (req, res) => {
   }
 })
 
-// GET /merchants/:id — public (used by checkout page for customer-facing view)
 app.get('/merchants/:id', async (req, res) => {
   try {
     const row = await db.execute({ sql: 'SELECT id, name, category, local_currency, arc_wallet_address, fx_rate_override FROM merchants WHERE id = ?', args: [req.params.id] })
@@ -314,7 +414,20 @@ app.get('/merchants/:id', async (req, res) => {
   }
 })
 
-// PATCH /merchants/:id/fx — requires auth + ownership
+app.get('/merchants', async (req, res) => {
+  try {
+    const q = (req.query.q as string | undefined)?.trim() ?? ''
+    if (!q) return res.json([])
+    const rows = await db.execute({
+      sql: `SELECT id, name, category FROM merchants WHERE LOWER(name) LIKE LOWER(?) LIMIT 10`,
+      args: [`%${q}%`],
+    })
+    res.json(rows.rows)
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 app.patch('/merchants/:id/fx', requireAuth, async (req, res) => {
   const authedReq = req as express.Request & { merchantId: string }
   if (authedReq.merchantId !== req.params.id) return res.status(403).json({ error: 'Forbidden' })
@@ -327,7 +440,6 @@ app.patch('/merchants/:id/fx', requireAuth, async (req, res) => {
   }
 })
 
-// Products
 app.get('/merchants/:id/products', async (req, res) => {
   try {
     const rows = await db.execute({ sql: 'SELECT * FROM products WHERE merchant_id = ? ORDER BY created_at DESC', args: [req.params.id] })
@@ -342,16 +454,25 @@ app.post('/merchants/:id/products', requireAuth, async (req, res) => {
   if (authedReq.merchantId !== req.params.id) return res.status(403).json({ error: 'Forbidden' })
   try {
     const { name, local_price, sku } = req.body as { name: string; local_price: number; sku?: string }
+    if (!name?.trim() || typeof local_price !== 'number' || local_price <= 0) {
+      return res.status(400).json({ error: 'name and a positive local_price are required' })
+    }
     const id = crypto.randomUUID()
-    await db.execute({ sql: 'INSERT INTO products (id, merchant_id, name, local_price, sku) VALUES (?, ?, ?, ?, ?)', args: [id, req.params.id, name, local_price, sku ?? null] })
-    res.json({ id, merchant_id: req.params.id, name, local_price, sku: sku ?? null, units_sold: 0 })
+    await db.execute({ sql: 'INSERT INTO products (id, merchant_id, name, local_price, sku) VALUES (?, ?, ?, ?, ?)', args: [id, req.params.id, name.trim(), local_price, sku ?? null] })
+    res.json({ id, merchant_id: req.params.id, name: name.trim(), local_price, sku: sku ?? null, units_sold: 0 })
   } catch (err) {
     res.status(500).json({ error: String(err) })
   }
 })
 
+// H-1: ownership check — verify product belongs to the authenticated merchant
 app.delete('/products/:id', requireAuth, async (req, res) => {
+  const authedReq = req as express.Request & { merchantId: string }
   try {
+    const row = await db.execute({ sql: 'SELECT merchant_id FROM products WHERE id = ?', args: [req.params.id] })
+    if (!row.rows.length) return res.status(404).json({ error: 'Product not found' })
+    const product = row.rows[0] as { merchant_id: string }
+    if (product.merchant_id !== authedReq.merchantId) return res.status(403).json({ error: 'Forbidden' })
     await db.execute({ sql: 'DELETE FROM products WHERE id = ?', args: [req.params.id] })
     res.json({ ok: true })
   } catch (err) {
@@ -359,10 +480,18 @@ app.delete('/products/:id', requireAuth, async (req, res) => {
   }
 })
 
-// Checkout sessions — public (customers create them via QR link)
+// H-2: validate merchant exists + amount_usdc > 0
 app.post('/sessions', async (req, res) => {
   try {
-    const { merchant_id, amount_usdc, amount_local, currency, fx_rate } = req.body as { merchant_id: string; amount_usdc: number; amount_local?: number; currency?: string; fx_rate?: number }
+    const { merchant_id, amount_usdc, amount_local, currency, fx_rate } = req.body as {
+      merchant_id: string; amount_usdc: number; amount_local?: number; currency?: string; fx_rate?: number
+    }
+    if (!merchant_id || typeof amount_usdc !== 'number' || amount_usdc <= 0) {
+      return res.status(400).json({ error: 'merchant_id and a positive amount_usdc are required' })
+    }
+    const mRow = await db.execute({ sql: 'SELECT id FROM merchants WHERE id = ?', args: [merchant_id] })
+    if (!mRow.rows.length) return res.status(404).json({ error: 'Merchant not found' })
+
     const id = crypto.randomUUID()
     const idempotency_key = crypto.randomUUID()
     const expires_at = new Date(Date.now() + 15 * 60 * 1000).toISOString()
@@ -386,27 +515,52 @@ app.get('/sessions/:id', async (req, res) => {
   }
 })
 
+// C-1: verify USDC Transfer event onchain before recording payment
 app.post('/sessions/:id/confirm', async (req, res) => {
   try {
-    const { tx_hash, from_address, network_fee_usdc, platform_fee_usdc } = req.body as { tx_hash: string; from_address: string; network_fee_usdc: number; platform_fee_usdc: number }
+    const { tx_hash, network_fee_usdc, platform_fee_usdc } = req.body as {
+      tx_hash: string; network_fee_usdc: number; platform_fee_usdc: number
+    }
+    if (!tx_hash || !tx_hash.startsWith('0x')) {
+      return res.status(400).json({ error: 'tx_hash required' })
+    }
+
     const sessionRow = await db.execute({ sql: 'SELECT * FROM checkout_sessions WHERE id = ?', args: [req.params.id] })
     if (!sessionRow.rows.length) return res.status(404).json({ error: 'session not found' })
     const session = sessionRow.rows[0] as { id: string; merchant_id: string; amount_usdc: number; status: string }
     if (session.status === 'CONFIRMED') return res.json({ ok: true, already: true })
+
+    // Idempotency: reject duplicate tx_hash
+    const dupCheck = await db.execute({ sql: 'SELECT id FROM transactions WHERE tx_hash = ?', args: [tx_hash] })
+    if (dupCheck.rows.length) return res.status(409).json({ error: 'Transaction already recorded' })
+
+    const mRow = await db.execute({ sql: 'SELECT arc_wallet_address FROM merchants WHERE id = ?', args: [session.merchant_id] })
+    if (!mRow.rows.length) return res.status(404).json({ error: 'merchant not found' })
+    const merchantAddress = mRow.rows[0].arc_wallet_address as string
+
+    // Verify onchain — rejects any fake or wrong-amount tx_hash
+    const verification = await verifyUsdcTransfer(tx_hash as `0x${string}`, merchantAddress, session.amount_usdc)
+    if (!verification.ok) {
+      console.warn(`[confirm] onchain verification failed for session ${session.id}: ${verification.error}`)
+      return res.status(422).json({ error: `Payment verification failed: ${verification.error}` })
+    }
+
     const txId = crypto.randomUUID()
     const now = new Date().toISOString()
     await db.execute({
-      sql: `INSERT INTO transactions (id, session_id, merchant_id, tx_hash, amount_usdc, network_fee_usdc, platform_fee_usdc, from_address, status, confirmed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?)`,
-      args: [txId, session.id, session.merchant_id, tx_hash, session.amount_usdc, network_fee_usdc, platform_fee_usdc, from_address, now],
+      sql: `INSERT INTO transactions (id, session_id, merchant_id, tx_hash, amount_usdc, network_fee_usdc, platform_fee_usdc, from_address, status, confirmed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?)`,
+      args: [txId, session.id, session.merchant_id, tx_hash, session.amount_usdc, network_fee_usdc ?? 0, platform_fee_usdc ?? 0, verification.fromAddress, now],
     })
     await db.execute({
       sql: `INSERT INTO fee_records (id, transaction_id, fee_type, amount_usdc) VALUES (?, ?, 'NETWORK', ?), (?, ?, 'PLATFORM', ?)`,
-      args: [crypto.randomUUID(), txId, network_fee_usdc, crypto.randomUUID(), txId, platform_fee_usdc],
+      args: [crypto.randomUUID(), txId, network_fee_usdc ?? 0, crypto.randomUUID(), txId, platform_fee_usdc ?? 0],
     })
     await db.execute({ sql: `UPDATE checkout_sessions SET status = 'CONFIRMED' WHERE id = ?`, args: [session.id] })
     res.json({ ok: true, transaction_id: txId })
   } catch (err) {
-    res.status(500).json({ error: String(err) })
+    console.error('POST /sessions/:id/confirm error:', err)
+    res.status(500).json({ error: 'Could not confirm payment. Please try again.' })
   }
 })
 
@@ -415,7 +569,9 @@ app.get('/merchants/:id/transactions', requireAuth, async (req, res) => {
   if (authedReq.merchantId !== req.params.id) return res.status(403).json({ error: 'Forbidden' })
   try {
     const rows = await db.execute({
-      sql: `SELECT t.*, cs.currency, cs.amount_local, cs.fx_rate FROM transactions t LEFT JOIN checkout_sessions cs ON cs.id = t.session_id WHERE t.merchant_id = ? ORDER BY t.created_at DESC LIMIT 100`,
+      sql: `SELECT t.*, cs.currency, cs.amount_local, cs.fx_rate FROM transactions t
+            LEFT JOIN checkout_sessions cs ON cs.id = t.session_id
+            WHERE t.merchant_id = ? ORDER BY t.created_at DESC LIMIT 100`,
       args: [req.params.id],
     })
     res.json(rows.rows)
@@ -454,20 +610,26 @@ app.post('/onramp/sessions', requireAuth, async (req, res) => {
     const row = await db.execute({ sql: 'SELECT arc_wallet_address FROM merchants WHERE id = ?', args: [merchantId] })
     if (!row.rows.length) return res.status(404).json({ error: 'merchant not found' })
     const storedAddress = row.rows[0].arc_wallet_address as string
-    if (storedAddress.toLowerCase() !== destination_address.toLowerCase()) return res.status(403).json({ error: 'destination_address does not match merchant wallet' })
+    if (storedAddress.toLowerCase() !== destination_address.toLowerCase()) {
+      return res.status(403).json({ error: 'destination_address does not match merchant wallet' })
+    }
 
-    const session = await onrampServer.onramp.createSession({ appUserId: merchantId, destinationAddress: destination_address, assets: { tokens: ['USDC'], chains: ['arc'] } })
+    const session = await onrampServer.onramp.createSession({
+      appUserId: merchantId,
+      destinationAddress: destination_address,
+      assets: { tokens: ['USDC'], chains: ['arc'] },
+    })
     res.setHeader('Cache-Control', 'no-store')
     res.json(session)
   } catch (err) {
     if (err instanceof KitError) return res.status(ONRAMP_STATUS[err.type] ?? 500).json({ error: err.message })
     console.error('POST /onramp/sessions error:', err)
-    res.status(500).json({ error: String((err as Error).message) })
+    res.status(500).json({ error: 'Could not create onramp session.' })
   }
 })
 
 // ── Start ─────────────────────────────────────────────────────────────────────
-const PORT = 3001
+const PORT = Number(process.env.PORT ?? 3001)
 initDb()
   .then(async () => {
     await warmUpCircle()
