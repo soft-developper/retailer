@@ -168,7 +168,15 @@ if (!USDC_CONTRACT) {
   console.warn('[startup] USDC_ADDRESS not set — onchain verification will fail')
 }
 
-const TRANSFER_ABI = parseAbi(['event Transfer(address indexed from, address indexed to, uint256 value)'])
+// PaymentReceived(address indexed merchant, address indexed payer, bytes32 indexed sessionId, uint256 amount)
+const PAYMENT_RECEIVED_ABI = parseAbi([
+  'event PaymentReceived(address indexed merchant, address indexed payer, bytes32 indexed sessionId, uint256 amount)',
+])
+
+const RETAILER_PAYMENTS_CONTRACT = (process.env.VITE_RETAILER_PAYMENTS_ADDRESS ?? '') as `0x${string}`
+if (!RETAILER_PAYMENTS_CONTRACT) {
+  console.warn('[startup] VITE_RETAILER_PAYMENTS_ADDRESS not set — onchain verification will use Transfer fallback')
+}
 
 const publicClient = createPublicClient({
   chain: arcTestnet,
@@ -187,26 +195,45 @@ async function verifyUsdcTransfer(
   expectedTo: string,
   expectedAmountUsdc: number
 ): Promise<VerifyResult> {
-  if (!ARC_RPC_URL || !USDC_CONTRACT) {
+  if (!ARC_RPC_URL) {
     return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Onchain verification not configured' }
   }
   const receipt = await publicClient.getTransactionReceipt({ hash: txHash })
   if (!receipt) return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Transaction not found' }
   if (receipt.status !== 'success') return { ok: false, fromAddress: '', amountUsdc: 0, error: 'Transaction reverted' }
 
-  const logs = receipt.logs.filter(
-    l => l.address.toLowerCase() === USDC_CONTRACT.toLowerCase()
-  )
+  // Primary: look for PaymentReceived from the RetailerPayments contract
+  if (RETAILER_PAYMENTS_CONTRACT) {
+    const contractLogs = receipt.logs.filter(
+      l => l.address.toLowerCase() === RETAILER_PAYMENTS_CONTRACT.toLowerCase()
+    )
+    for (const log of contractLogs) {
+      try {
+        const { args } = decodeEventLog({ abi: PAYMENT_RECEIVED_ABI, data: log.data, topics: log.topics })
+        if (!args) continue
+        const { merchant, payer, amount } = args as { merchant: string; payer: string; sessionId: `0x${string}`; amount: bigint }
+        if (merchant.toLowerCase() !== expectedTo.toLowerCase()) continue
+        const amountUsdc = Number(amount) / 1_000_000
+        if (Math.abs(amountUsdc - expectedAmountUsdc) > 0.005) {
+          return { ok: false, fromAddress: payer, amountUsdc, error: `Amount mismatch: got ${amountUsdc} USDC, expected ${expectedAmountUsdc}` }
+        }
+        return { ok: true, fromAddress: payer, amountUsdc }
+      } catch { continue }
+    }
+  }
 
-  for (const log of logs) {
+  // Fallback: raw USDC Transfer event (for wallets that bypass the contract)
+  const transferAbi = parseAbi(['event Transfer(address indexed from, address indexed to, uint256 value)'])
+  const usdcLogs = receipt.logs.filter(
+    l => USDC_CONTRACT && l.address.toLowerCase() === USDC_CONTRACT.toLowerCase()
+  )
+  for (const log of usdcLogs) {
     try {
-      const { args } = decodeEventLog({ abi: TRANSFER_ABI, data: log.data, topics: log.topics })
+      const { args } = decodeEventLog({ abi: transferAbi, data: log.data, topics: log.topics })
       if (!args) continue
       const { from, to, value } = args as { from: string; to: string; value: bigint }
       if (to.toLowerCase() !== expectedTo.toLowerCase()) continue
-      // USDC has 6 decimals
       const amountUsdc = Number(value) / 1_000_000
-      // Allow up to 0.005 USDC tolerance for rounding
       if (Math.abs(amountUsdc - expectedAmountUsdc) > 0.005) {
         return { ok: false, fromAddress: from, amountUsdc, error: `Amount mismatch: got ${amountUsdc} USDC, expected ${expectedAmountUsdc}` }
       }
@@ -214,7 +241,7 @@ async function verifyUsdcTransfer(
     } catch { continue }
   }
 
-  return { ok: false, fromAddress: '', amountUsdc: 0, error: 'No matching USDC Transfer event found' }
+  return { ok: false, fromAddress: '', amountUsdc: 0, error: 'No matching payment event found' }
 }
 
 // ── Circle Wallets ─────────────────────────────────────────────────────────────

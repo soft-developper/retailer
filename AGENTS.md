@@ -11,7 +11,14 @@ USDC payment platform on Arc Testnet. Merchants accept QR-code payments; custome
 - Chain: Arc Testnet (chain ID 5042002), USDC ERC-20 at 0x3600000000000000000000000000000000000000
 
 ## Deployed Contracts
-None — MVP uses direct USDC ERC-20 transfers only.
+| Contract | Network | Address |
+|---|---|---|
+| RetailerPayments | Arc Testnet | `0x57c211cd15131f4c43e3d808f6f8bffcbfed402a` |
+
+- Explorer: https://explorer.testnet.arc.io/address/0x57c211cd15131f4c43e3d808f6f8bffcbfed402a
+- Constructor arg: USDC `0x3600000000000000000000000000000000000000`
+- Env var: `VITE_RETAILER_PAYMENTS_ADDRESS`
+- Payments flow through `pay(merchant, sessionId, amount)`, emitting `PaymentReceived` for backend verification.
 
 ## Merchant Wallets
 Each merchant gets a Circle developer-controlled EOA on Arc Testnet.

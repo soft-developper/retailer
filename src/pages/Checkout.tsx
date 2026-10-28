@@ -2,16 +2,27 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
 import { ConnectKitButton } from 'connectkit'
-import { erc20Abi, parseUnits } from 'viem'
+import { parseUnits, keccak256, toBytes } from 'viem'
 import { arcTestnet } from 'viem/chains'
 import { ShoppingBag, ShieldCheck, AlertCircle } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { api, type Merchant, type CheckoutSession } from '../lib/api'
-import { getUsdc } from '@/onchain-facts'
+import retailerPaymentsArtifact from '../../contracts/out/RetailerPayments.sol/RetailerPayments.json'
 
 const ARC_TESTNET_CHAIN_ID = arcTestnet.id
-const PLATFORM_FEE_USDC = 0.01 // $0.01 flat platform fee (demo)
-const ESTIMATED_GAS_USDC = 0.001 // ~$0.001 Arc gas estimate
+const PLATFORM_FEE_USDC = 0.01
+const ESTIMATED_GAS_USDC = 0.001
+
+const RETAILER_PAYMENTS_ADDRESS = (import.meta.env.VITE_RETAILER_PAYMENTS_ADDRESS ?? '') as `0x${string}`
+const RETAILER_PAYMENTS_ABI = retailerPaymentsArtifact.abi
+
+// Encode sessionId string → bytes32
+function toBytes32(s: string): `0x${string}` {
+  return keccak256(toBytes(s))
+}
+
+// USDC decimals on Arc
+const USDC_DECIMALS = 6
 
 export default function Checkout() {
   const [params] = useSearchParams()
@@ -117,18 +128,19 @@ export default function Checkout() {
     : parseFloat(manualAmount || '0')
 
   const totalUsdc = amountUsdc + ESTIMATED_GAS_USDC + PLATFORM_FEE_USDC
-  const usdcFact = getUsdc(ARC_TESTNET_CHAIN_ID)
 
   function handlePay() {
-    if (!usdcFact || !merchant || amountUsdc <= 0) return
+    if (!merchant || amountUsdc <= 0) return
     if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_CHAIN_ID }); return }
 
-    const raw = parseUnits(amountUsdc.toFixed(6), usdcFact.decimals)
+    const sid = session?.id ?? sessionId ?? 'open'
+    const raw = parseUnits(amountUsdc.toFixed(6), USDC_DECIMALS)
+
     writeContract({
-      address: usdcFact.address as `0x${string}`,
-      abi: erc20Abi,
-      functionName: 'transfer',
-      args: [merchant.arc_wallet_address as `0x${string}`, raw],
+      address: RETAILER_PAYMENTS_ADDRESS,
+      abi: RETAILER_PAYMENTS_ABI,
+      functionName: 'pay',
+      args: [merchant.arc_wallet_address as `0x${string}`, toBytes32(sid), raw],
       chainId: ARC_TESTNET_CHAIN_ID,
     })
   }

@@ -1,0 +1,119 @@
+{
+  "contractAddress": "0x57c211cd15131f4c43e3d808f6f8bffcbfed402a",
+  "network": "ARC-TESTNET",
+  "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
+  "contract_code_path": "/home/user/app/contracts/RetailerPayments.sol",
+  "contract_compiled_code_path": "/home/user/app/contracts/out/RetailerPayments.sol/RetailerPayments.json",
+  "contract_network_and_links": {
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x57c211cd15131f4c43e3d808f6f8bffcbfed402a"
+  },
+  "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x57c211cd15131f4c43e3d808f6f8bffcbfed402a",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x57c211cd15131f4c43e3d808f6f8bffcbfed402a",
+      "txHash": "0xc5127f2954772b76597e0cc02afc01a2988f581707cc1f41e5e1fa5ba2262b26",
+      "deployedAt": "2026-10-28T19:36:11.877Z"
+    }
+  ],
+  "abi": [
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "usdcToken",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "pay",
+      "inputs": [
+        {
+          "name": "merchant",
+          "type": "address",
+          "internalType": "address"
+        },
+        {
+          "name": "sessionId",
+          "type": "bytes32",
+          "internalType": "bytes32"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "usdc",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "",
+          "type": "address",
+          "internalType": "contract IERC20"
+        }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "event",
+      "name": "PaymentReceived",
+      "inputs": [
+        {
+          "name": "merchant",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "payer",
+          "type": "address",
+          "indexed": true,
+          "internalType": "address"
+        },
+        {
+          "name": "sessionId",
+          "type": "bytes32",
+          "indexed": true,
+          "internalType": "bytes32"
+        },
+        {
+          "name": "amount",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
+        }
+      ],
+      "anonymous": false
+    },
+    {
+      "type": "error",
+      "name": "TransferFailed",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroAmount",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroMerchant",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "ZeroSessionId",
+      "inputs": []
+    }
+  ]
+}
