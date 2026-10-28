@@ -43,6 +43,8 @@ app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   if (req.method === 'OPTIONS') { res.sendStatus(204); return }
+  // Prevent browser caching of API responses — always fetch fresh data
+  res.setHeader('Cache-Control', 'no-store')
   next()
 })
 

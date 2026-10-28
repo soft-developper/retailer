@@ -430,3 +430,6 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/ui/Sidebar.tsx","timestamp":1793219481020}
 {"level":"debug","message":"[vite] hot updated: /src/components/dashboard/ProductList.tsx","timestamp":1793219481020}
 {"level":"debug","message":"[vite] hot updated: /src/components/dashboard/OnrampModal.tsx","timestamp":1793219481020}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793219504613}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793219504630}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793219689598}
