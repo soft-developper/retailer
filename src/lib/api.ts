@@ -73,6 +73,8 @@ export const api = {
   // Merchants
   createMerchant: (body: { name: string; category: string; local_currency: string }) =>
     req<Merchant>('POST', '/merchants', body),
+  findMerchantsByName: (name: string) =>
+    req<Merchant[]>('GET', `/merchants?name=${encodeURIComponent(name)}`),
   getMerchant: (id: string) => req<Merchant>('GET', `/merchants/${id}`),
   updateFxOverride: (id: string, fx_rate_override: number | null) =>
     req<{ ok: boolean }>('PATCH', `/merchants/${id}/fx`, { fx_rate_override }),

@@ -1,11 +1,129 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCurrentMerchantId } from '../lib/merchantStore'
-import { ShoppingBag, QrCode, BarChart3, ArrowRight } from 'lucide-react'
+import { ShoppingBag, QrCode, BarChart3, ArrowRight, X, Loader2, AlertCircle } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
+import { api, type Merchant } from '../lib/api'
+import { setCurrentMerchantId, getCurrentMerchantId } from '../lib/merchantStore'
+
+function SignInModal({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate()
+  const [name, setName] = useState('')
+  const [results, setResults] = useState<Merchant[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function search() {
+    if (!name.trim()) return
+    setLoading(true)
+    setError('')
+    setResults(null)
+    try {
+      const found = await api.findMerchantsByName(name.trim())
+      setResults(found)
+      if (found.length === 0) setError('No business found with that name. Check the spelling or sign up.')
+    } catch {
+      setError('Could not reach the server. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function signIn(merchant: Merchant) {
+    setCurrentMerchantId(merchant.id)
+    void navigate('/dashboard')
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[rgba(15,23,42,0.06)]">
+          <div>
+            <h2 className="text-base font-bold text-[#0F172A]" style={{ fontFamily: 'Space Grotesk' }}>
+              Sign in to your business
+            </h2>
+            <p className="text-xs text-[#64748b] mt-0.5">Enter your business name to continue</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-[rgba(15,23,42,0.05)] text-[#64748b] transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          {/* Search input */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void search() }}
+              placeholder="e.g. Mama Ngozi Groceries"
+              className="flex-1 border border-[rgba(15,23,42,0.12)] rounded-xl px-4 py-2.5 text-sm text-[#0F172A] placeholder-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0F172A]/20 focus:border-[#0F172A]"
+              autoFocus
+            />
+            <button
+              onClick={() => void search()}
+              disabled={loading || !name.trim()}
+              className="bg-[#0F172A] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#1e293b] disabled:opacity-40 transition-colors flex items-center gap-2"
+            >
+              {loading ? <Loader2 size={15} className="animate-spin" /> : 'Find'}
+            </button>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-2 text-sm text-[#DC2626] bg-[#FEF2F2] rounded-xl px-4 py-3">
+              <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Results */}
+          {results && results.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-[#64748b] uppercase tracking-wider">Select your business</p>
+              {results.map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => signIn(m)}
+                  className="w-full flex items-center justify-between gap-3 p-4 rounded-xl border border-[rgba(15,23,42,0.08)] hover:border-[#0F172A] hover:bg-[rgba(15,23,42,0.02)] transition-all text-left group"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#0F172A] truncate">{m.name}</p>
+                    <p className="text-xs text-[#64748b] capitalize">{m.category} · {m.local_currency}</p>
+                  </div>
+                  <ArrowRight size={16} className="text-[#94a3b8] group-hover:text-[#0F172A] flex-shrink-0 transition-colors" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-[#94a3b8] text-center">
+            Don't have an account?{' '}
+            <button
+              onClick={() => { onClose(); }}
+              className="text-[#0F172A] font-medium hover:underline"
+            >
+              Sign up instead
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Landing() {
   const navigate = useNavigate()
   const merchantId = getCurrentMerchantId()
+  const [showSignIn, setShowSignIn] = useState(false)
 
   return (
     <div className="min-h-dvh bg-[#FAFAF8] flex flex-col">
@@ -19,12 +137,22 @@ export default function Landing() {
             Retailer
           </span>
         </div>
-        <button
-          onClick={() => { void navigate(merchantId ? '/dashboard' : '/onboarding') }}
-          className="text-sm font-medium text-[#0F172A] hover:text-[#2563EB] transition-colors"
-        >
-          {merchantId ? 'Dashboard' : 'Sign up'}
-        </button>
+        <div className="flex items-center gap-4">
+          {!merchantId && (
+            <button
+              onClick={() => setShowSignIn(true)}
+              className="text-sm font-medium text-[#334155] hover:text-[#0F172A] transition-colors"
+            >
+              Sign in
+            </button>
+          )}
+          <button
+            onClick={() => { void navigate(merchantId ? '/dashboard' : '/onboarding') }}
+            className="text-sm font-medium text-[#0F172A] hover:text-[#2563EB] transition-colors"
+          >
+            {merchantId ? 'Dashboard' : 'Sign up'}
+          </button>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -54,6 +182,14 @@ export default function Landing() {
             {merchantId ? 'Open dashboard' : 'Start accepting payments'}
             <ArrowRight size={16} />
           </button>
+          {!merchantId && (
+            <button
+              onClick={() => setShowSignIn(true)}
+              className="text-sm font-medium text-[#334155] hover:text-[#0F172A] transition-colors"
+            >
+              Already have an account? Sign in
+            </button>
+          )}
           {merchantId && (
             <button
               onClick={() => { void navigate('/onboarding') }}
@@ -102,6 +238,8 @@ export default function Landing() {
       <footer className="text-center py-6 text-xs text-[#94a3b8]">
         Retailer runs on Arc Testnet. Payments are in USDC.
       </footer>
+
+      {showSignIn && <SignInModal onClose={() => setShowSignIn(false)} />}
     </div>
   )
 }

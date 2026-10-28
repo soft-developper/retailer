@@ -168,3 +168,32 @@
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022491319}
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022551905}
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022558311}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022657309}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022848447}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793022848476}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793023068575}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793023517334}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793094146850}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793094148279}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793094149481}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793094150237}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793095146789}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793095156340}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793199807016}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793199953598}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793200833559}
+{"level":"debug","message":"[vite] connected.","timestamp":1793200918431}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793200919661}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793201069594}
+{"level":"debug","message":"[vite] connected.","timestamp":1793201076215}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793201076595}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793201102047,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793202409599}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793202448177,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793202475609}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793202514117,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793205759109}
+{"level":"debug","message":"[vite] hot updated: /src/pages/Landing.tsx","timestamp":1793205779283}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793205779283}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793205786658}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793205877629}

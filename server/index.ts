@@ -197,6 +197,22 @@ app.post('/merchants', async (req, res) => {
   }
 })
 
+// Find merchant by name (sign-in lookup)
+app.get('/merchants', async (req, res) => {
+  try {
+    const name = (req.query.name as string | undefined)?.trim()
+    if (!name) return res.status(400).json({ error: 'name query param required' })
+    const rows = await db.execute({
+      sql: `SELECT id, name, category, local_currency, arc_wallet_address, fx_rate_override, created_at
+            FROM merchants WHERE LOWER(name) = LOWER(?) LIMIT 5`,
+      args: [name],
+    })
+    res.json(rows.rows)
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 // Get merchant
 app.get('/merchants/:id', async (req, res) => {
   try {
