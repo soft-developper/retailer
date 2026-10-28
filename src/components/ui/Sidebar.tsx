@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { ShoppingBag, LayoutDashboard, QrCode, LogOut, Menu, X } from 'lucide-react'
 import { clearCurrentMerchantId } from '../../lib/merchantStore'
+import { api } from '../../lib/api'
 import type { Merchant } from '../../lib/api'
 
 interface Props {
@@ -77,6 +78,7 @@ export default function Sidebar({ merchant }: Props) {
 
   function logout(): void {
     clearCurrentMerchantId()
+    void api.logout().catch(() => {})
     void navigate('/')
   }
 
