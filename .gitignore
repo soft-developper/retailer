@@ -27,3 +27,5 @@ contracts/broadcast/
 # Logs
 /tmp/
 *.log
+console.jsonl
+traces.jsonl
