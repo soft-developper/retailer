@@ -445,3 +445,10 @@
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220336724}
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220344546}
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220382602}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220513592}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220526582}
+{"level":"debug","message":"[vite] connected.","timestamp":1793220952352}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220952602}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220966405}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/ProductList.tsx","timestamp":1793220984414}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793220984415}

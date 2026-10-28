@@ -506,6 +506,32 @@ app.post('/merchants/:id/products', requireAuth, async (req, res) => {
 })
 
 // H-1: ownership check — verify product belongs to the authenticated merchant
+app.patch('/products/:id', requireAuth, async (req, res) => {
+  const authedReq = req as express.Request & { merchantId: string }
+  try {
+    const { name, local_price, sku } = req.body as { name?: string; local_price?: number; sku?: string }
+    if (local_price !== undefined && (typeof local_price !== 'number' || local_price <= 0)) {
+      return res.status(400).json({ error: 'local_price must be a positive number' })
+    }
+    const row = await db.execute({ sql: 'SELECT merchant_id FROM products WHERE id = ?', args: [req.params.id] })
+    if (!row.rows.length) return res.status(404).json({ error: 'Product not found' })
+    const product = row.rows[0] as { merchant_id: string }
+    if (product.merchant_id !== authedReq.merchantId) return res.status(403).json({ error: 'Forbidden' })
+    const updates: string[] = []
+    const args: (string | number)[] = []
+    if (name !== undefined) { updates.push('name = ?'); args.push(name.trim()) }
+    if (local_price !== undefined) { updates.push('local_price = ?'); args.push(local_price) }
+    if (sku !== undefined) { updates.push('sku = ?'); args.push(sku.trim()) }
+    if (!updates.length) return res.status(400).json({ error: 'Nothing to update' })
+    args.push(req.params.id)
+    await db.execute({ sql: `UPDATE products SET ${updates.join(', ')} WHERE id = ?`, args })
+    const updated = await db.execute({ sql: 'SELECT * FROM products WHERE id = ?', args: [req.params.id] })
+    res.json(updated.rows[0])
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
+})
+
 app.delete('/products/:id', requireAuth, async (req, res) => {
   const authedReq = req as express.Request & { merchantId: string }
   try {

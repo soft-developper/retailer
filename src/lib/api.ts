@@ -117,6 +117,8 @@ export const api = {
   getProducts: (merchantId: string) => req<Product[]>('GET', `/merchants/${merchantId}/products`),
   createProduct: (merchantId: string, body: { name: string; local_price: number; sku?: string }) =>
     req<Product>('POST', `/merchants/${merchantId}/products`, body),
+  updateProduct: (id: string, body: { name?: string; local_price?: number; sku?: string }) =>
+    req<Product>('PATCH', `/products/${id}`, body),
   deleteProduct: (id: string) => req<{ ok: boolean }>('DELETE', `/products/${id}`),
 
   // Sessions
