@@ -4,9 +4,8 @@ services:
     runtime: node
     region: oregon
     plan: free
-    buildCommand: `curl -fsSL https://bun.sh/install
+    buildCommand: curl -fsSL https://bun.sh/install | bash && ~/.bun/bin/bun install
     startCommand: ~/.bun/bin/bun run server/index.ts
-
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
