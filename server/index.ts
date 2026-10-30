@@ -435,23 +435,6 @@ app.get('/auth/me', async (req, res) => {
 
 app.get('/health', (_req, res) => res.json({ ok: true }))
 
-// ONE-TIME wipe — protected by secret token, removed after use
-app.post('/admin/wipe', async (req, res) => {
-  const secret = process.env.WIPE_SECRET
-  if (!secret || req.headers['x-wipe-secret'] !== secret) {
-    return res.status(403).json({ error: 'Forbidden' })
-  }
-  try {
-    await db.execute('DELETE FROM fee_records')
-    await db.execute('DELETE FROM transactions')
-    await db.execute('DELETE FROM checkout_sessions')
-    await db.execute('DELETE FROM products')
-    await db.execute('DELETE FROM merchants')
-    res.json({ ok: true, wiped: ['fee_records', 'transactions', 'checkout_sessions', 'products', 'merchants'] })
-  } catch (err) {
-    res.status(500).json({ error: String(err) })
-  }
-})
 
 app.get('/fx/:currency', async (req, res) => {
   try {
