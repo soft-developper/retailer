@@ -5,7 +5,7 @@
 
 import { http, createConfig } from 'wagmi'
 import { mainnet } from 'wagmi/chains'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { injected, walletConnect, coinbaseWallet } from 'wagmi/connectors'
 import { ConnectKitProvider, getDefaultConfig } from 'connectkit'
 import { registerChain } from './tracing'
@@ -13,15 +13,15 @@ import { registerChain } from './tracing'
 export { ConnectKitProvider }
 
 // Pre-register chain RPC URLs so trace events show correct chain names immediately
-registerChain(arcTestnet.id, arcTestnet.rpcUrls.default.http[0])
+registerChain(arc.id, 'https://rpc.mainnet.arc.io')
 
 const wcProjectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined
 
 export const config = createConfig(
   getDefaultConfig({
-    chains: [arcTestnet, mainnet],
+    chains: [arc, mainnet],
     transports: {
-      [arcTestnet.id]: http(),
+      [arc.id]: http('https://rpc.mainnet.arc.io'),
       [mainnet.id]: http(),
     },
     walletConnectProjectId: wcProjectId ?? '',

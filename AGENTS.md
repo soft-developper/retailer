@@ -8,7 +8,7 @@ USDC payment platform on Arc Testnet. Merchants accept QR-code payments; custome
 - Backend: Bun/Express API server on port 3001, proxied via Vite `/api`
 - DB: Turso (libSQL) via `@libsql/client`
 - Wallets: Circle developer-controlled wallets SDK
-- Chain: Arc Testnet (chain ID 5042002), USDC ERC-20 at 0x3600000000000000000000000000000000000000
+- Chain: Arc Mainnet (chain ID 5042), USDC ERC-20 at 0x3600000000000000000000000000000000000000
 
 ## Deployed Contracts
 | Contract | Network | Address |

@@ -8,7 +8,7 @@ import jwt from 'jsonwebtoken'
 import cookieParser from 'cookie-parser'
 import rateLimit from 'express-rate-limit'
 import { createPublicClient, http, parseAbi, decodeEventLog } from 'viem'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 
 // ── L-1: require JWT_SECRET at startup — no insecure fallback ─────────────────
 const JWT_SECRET = process.env.JWT_SECRET
@@ -192,7 +192,7 @@ if (!RETAILER_PAYMENTS_CONTRACT) {
 }
 
 const publicClient = createPublicClient({
-  chain: arcTestnet,
+  chain: arc,
   transport: http(ARC_RPC_URL ?? ''),
 })
 

@@ -452,3 +452,48 @@
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793220966405}
 {"level":"debug","message":"[vite] hot updated: /src/components/dashboard/ProductList.tsx","timestamp":1793220984414}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793220984415}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793221000600}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793221001333}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793222803529}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793222803572}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793263709532}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793263709604}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793265283499}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793265283502}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793265500440}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793265500456}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793265605391}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793265608345}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793265608725}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793265608776}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793266320066}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793266337374}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793266340909}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793268145496}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793268145499}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793294216630}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793294217885}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793296021945}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793296044609}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793296047365}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793350727349}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793350728003}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793350733741,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793350742342}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793350742887}
+{"level":"error","message":"Warning: You are calling ReactDOMClient.createRoot() on a container that has already been passed to createRoot() before. Instead, call root.render() on the existing root instead if you want to update it.","timestamp":1793350749262}
+{"level":"debug","message":"[vite] invalidate /src/main.tsx: Could not Fast Refresh (\"true\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1793350749265}
+{"level":"debug","message":"[vite] hot updated: /src/main.tsx","timestamp":1793350749265}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350749265}
+{"level":"warn","message":"WalletConnect Core is already initialized. This is probably a mistake and can lead to unexpected behavior. Init() was called 2 times.","timestamp":1793350749339}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350749593}
+{"level":"error","message":"[vite] ReferenceError: arcTestnet is not defined\n    at https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/pages/Checkout.tsx?t=1793350751001:33:30","timestamp":1793350751629,"stack":"ReferenceError: arcTestnet is not defined\n    at https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/pages/Checkout.tsx?t=1793350751001:33:30"}
+{"level":"error","message":"[vite] Failed to reload /src/pages/Checkout.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1793350751629}
+{"level":"debug","message":"[vite] hot updated: /src/pages/Checkout.tsx","timestamp":1793350752085}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350752086}
+{"level":"debug","message":"[vite] hot updated: /src/pages/Checkout.tsx","timestamp":1793350753865}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350753865}
+{"level":"debug","message":"[vite] hot updated: /src/pages/Checkout.tsx","timestamp":1793350757966}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350757966}
+{"level":"debug","message":"[vite] hot updated: /src/pages/Checkout.tsx","timestamp":1793350762850}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793350762850}

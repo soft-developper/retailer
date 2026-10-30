@@ -3,12 +3,12 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useSwitchChain } from 'wagmi'
 import { ConnectKitButton } from 'connectkit'
 import { parseUnits, keccak256, toBytes } from 'viem'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { ShoppingBag, ShieldCheck, AlertCircle } from 'lucide-react'
 import { TokenUSDC } from '@web3icons/react'
 import { api, type Merchant, type CheckoutSession } from '../lib/api'
 
-const ARC_TESTNET_CHAIN_ID = arcTestnet.id
+const ARC_CHAIN_ID = arc.id
 const PLATFORM_FEE_USDC = 0.01
 const ESTIMATED_GAS_USDC = 0.001
 const USDC_DECIMALS = 6
@@ -93,7 +93,7 @@ export default function Checkout() {
   const { isLoading: isPayConfirming, isSuccess: isPaySuccess, data: payReceipt } =
     useWaitForTransactionReceipt({ hash: payTxHash })
 
-  const isWrongChain = isConnected && chainId !== ARC_TESTNET_CHAIN_ID
+  const isWrongChain = isConnected && chainId !== ARC_CHAIN_ID
 
   // Load merchant and session
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function Checkout() {
       abi: RETAILER_PAYMENTS_ABI,
       functionName: 'pay',
       args: [merchant!.arc_wallet_address as `0x${string}`, toBytes32(sid), raw],
-      chainId: ARC_TESTNET_CHAIN_ID,
+      chainId: ARC_CHAIN_ID,
     })
     setPayStep('paying')
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,7 +175,7 @@ export default function Checkout() {
       console.error('VITE_RETAILER_PAYMENTS_ADDRESS is not set — cannot process payment')
       return
     }
-    if (isWrongChain) { switchChain({ chainId: ARC_TESTNET_CHAIN_ID }); return }
+    if (isWrongChain) { switchChain({ chainId: ARC_CHAIN_ID }); return }
     resetApprove()
     resetPay()
     setPayStep('approving')
@@ -186,7 +186,7 @@ export default function Checkout() {
       abi: ERC20_APPROVE_ABI,
       functionName: 'approve',
       args: [RETAILER_PAYMENTS_ADDRESS, raw],
-      chainId: ARC_TESTNET_CHAIN_ID,
+      chainId: ARC_CHAIN_ID,
     })
   }
 
@@ -362,10 +362,10 @@ export default function Checkout() {
             </div>
           ) : isWrongChain ? (
             <button
-              onClick={() => switchChain({ chainId: ARC_TESTNET_CHAIN_ID })}
+              onClick={() => switchChain({ chainId: ARC_CHAIN_ID })}
               className="w-full py-4 rounded-xl bg-[#FEF9C3] text-[#854D0E] font-semibold text-sm border border-[#FDE047]/50"
             >
-              Switch to Arc Testnet to continue
+              Switch to Arc to continue
             </button>
           ) : isBusy ? (
             <div className="w-full py-4 rounded-xl bg-[#0F172A] text-white font-semibold text-sm flex items-center justify-center gap-2">
@@ -400,7 +400,7 @@ export default function Checkout() {
         </div>
 
         <p className="text-center text-xs text-[#94a3b8]">
-          Payments are settled instantly on Arc Testnet
+          Payments are settled instantly on Arc
         </p>
       </div>
     </div>
