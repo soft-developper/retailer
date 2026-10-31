@@ -1,10 +1,9 @@
 import { ExternalLink } from 'lucide-react'
-import { buildTxExplorerUrl } from '@/onchain-facts'
 import StatusBadge from '../ui/StatusBadge'
 import SkeletonCard from '../ui/SkeletonCard'
 import type { Transaction } from '../../lib/api'
 
-const ARC_TESTNET_CHAIN_ID = 5042002
+const ARC_EXPLORER = 'https://explorer.arc.io'
 
 interface Props {
   transactions: Transaction[]
@@ -77,7 +76,7 @@ export default function TransactionFeed({ transactions, loading, currency, fxRat
                   <StatusBadge status={tx.status} />
                   {tx.tx_hash && (
                     <a
-                      href={buildTxExplorerUrl(ARC_TESTNET_CHAIN_ID, tx.tx_hash)}
+                      href={`${ARC_EXPLORER}/tx/${tx.tx_hash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-1.5 text-[#94a3b8] hover:text-[#2563EB] transition-colors"
