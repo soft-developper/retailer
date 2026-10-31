@@ -715,6 +715,126 @@ app.post('/onramp/sessions', requireAuth, async (req, res) => {
   }
 })
 
+// ── Withdraw ──────────────────────────────────────────────────────────────────
+const USDC_TOKEN_ADDRESS = '0x3600000000000000000000000000000000000000'
+const ARC_BLOCKCHAIN_NAME = process.env.ARC_BLOCKCHAIN ?? 'ARC'
+
+// GET /wallet/balance — returns live USDC balance from Circle
+app.get('/wallet/balance', requireAuth, async (req, res) => {
+  const authedReq = req as express.Request & { merchantId: string }
+  try {
+    const mRow = await db.execute({ sql: 'SELECT circle_wallet_id FROM merchants WHERE id = ?', args: [authedReq.merchantId] })
+    if (!mRow.rows.length) return res.status(404).json({ error: 'Merchant not found' })
+    const walletId = mRow.rows[0].circle_wallet_id as string | null
+    if (!walletId) return res.status(400).json({ error: 'No Circle wallet found for this merchant' })
+    const client = getCircleClient()
+    const balRes = await client.getWalletTokenBalance({ id: walletId })
+    const balances = balRes.data?.tokenBalances ?? []
+    const usdc = balances.find(b => b.token?.symbol === 'USDC')
+    res.json({ balance: usdc?.amount ?? '0', walletId })
+  } catch (err) {
+    console.error('GET /wallet/balance error:', err)
+    res.status(500).json({ error: 'Could not fetch balance' })
+  }
+})
+
+// POST /withdraw — estimate fee, create transaction, poll to terminal state
+app.post('/withdraw', requireAuth, async (req, res) => {
+  const authedReq = req as express.Request & { merchantId: string }
+  try {
+    const { destination_address, amount_usdc } = req.body as { destination_address: string; amount_usdc: number }
+
+    // Input validation
+    if (!destination_address || !/^0x[0-9a-fA-F]{40}$/.test(destination_address)) {
+      return res.status(400).json({ error: 'Invalid destination address' })
+    }
+    if (typeof amount_usdc !== 'number' || amount_usdc <= 0) {
+      return res.status(400).json({ error: 'amount_usdc must be a positive number' })
+    }
+    if (amount_usdc < 0.01) {
+      return res.status(400).json({ error: 'Minimum withdrawal is 0.01 USDC' })
+    }
+
+    const mRow = await db.execute({ sql: 'SELECT circle_wallet_id, arc_wallet_address FROM merchants WHERE id = ?', args: [authedReq.merchantId] })
+    if (!mRow.rows.length) return res.status(404).json({ error: 'Merchant not found' })
+    const { circle_wallet_id: walletId, arc_wallet_address: fromAddress } = mRow.rows[0] as { circle_wallet_id: string; arc_wallet_address: string }
+    if (!walletId) return res.status(400).json({ error: 'No Circle wallet found' })
+
+    // Prevent self-send
+    if (destination_address.toLowerCase() === fromAddress?.toLowerCase()) {
+      return res.status(400).json({ error: 'Cannot withdraw to the same wallet' })
+    }
+
+    const client = getCircleClient()
+
+    // Check live balance
+    const balRes = await client.getWalletTokenBalance({ id: walletId })
+    const balances = balRes.data?.tokenBalances ?? []
+    const usdc = balances.find(b => b.token?.symbol === 'USDC')
+    const available = parseFloat(usdc?.amount ?? '0')
+    if (amount_usdc > available) {
+      return res.status(400).json({ error: `Insufficient balance. Available: ${available.toFixed(6)} USDC` })
+    }
+
+    // Estimate fee first
+    let feeEstimate: string | undefined
+    try {
+      const feeRes = await client.estimateTransferFee({
+        walletId,
+        tokenAddress: USDC_TOKEN_ADDRESS,
+        blockchain: ARC_BLOCKCHAIN_NAME as never,
+        destinationAddress: destination_address,
+        amount: [amount_usdc.toFixed(6)],
+      })
+      feeEstimate = feeRes.data?.medium?.networkFee ?? undefined
+    } catch { /* fee estimate is best-effort */ }
+
+    // Create the transaction
+    const txRes = await client.createTransaction({
+      walletId,
+      tokenAddress: USDC_TOKEN_ADDRESS,
+      destinationAddress: destination_address,
+      amount: [amount_usdc.toFixed(6)],
+      fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
+    })
+    const txId = txRes.data?.id
+    if (!txId) throw new Error('Transaction creation failed — no ID returned')
+
+    // Poll for terminal state (max 30s on Arc mainnet — sub-second finality)
+    let txHash: string | undefined
+    let state: string | undefined
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 1000))
+      const poll = await client.getTransaction({ id: txId })
+      state = poll.data?.transaction?.state
+      txHash = poll.data?.transaction?.txHash ?? undefined
+      if (state === 'COMPLETE' || state === 'FAILED' || state === 'DENIED' || state === 'CANCELLED') break
+    }
+
+    if (state !== 'COMPLETE') {
+      return res.status(500).json({
+        error: `Withdrawal ${state === 'FAILED' ? 'failed' : state === 'DENIED' ? 'was denied by risk screening' : `ended in state: ${state}`}`,
+        state, txId,
+      })
+    }
+
+    // Record withdrawal in transactions table
+    const id = crypto.randomUUID()
+    const now = new Date().toISOString()
+    await db.execute({
+      sql: `INSERT INTO transactions (id, merchant_id, tx_hash, amount_usdc, network_fee_usdc, platform_fee_usdc, from_address, status, confirmed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIRMED', ?)`,
+      args: [id, authedReq.merchantId, txHash ?? null, -amount_usdc, parseFloat(feeEstimate ?? '0'), 0, fromAddress, now],
+    })
+
+    const explorerUrl = `https://explorer.arc.io/tx/${txHash}`
+    res.json({ ok: true, txHash, txId, state, feeEstimate, explorerUrl })
+  } catch (err) {
+    console.error('POST /withdraw error:', err)
+    res.status(500).json({ error: 'Withdrawal failed. Please try again.' })
+  }
+})
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT ?? 3001)
 initDb()

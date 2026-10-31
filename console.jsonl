@@ -509,3 +509,48 @@
 {"level":"error","message":"Error checking Cross-Origin-Opener-Policy: Failed to fetch","timestamp":1793352976840}
 {"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793352982295}
 {"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793352982625}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793352985908}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793352986122}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793352996802}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793352996971}
+{"level":"debug","message":"[vite] connected.","timestamp":1793353225941}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793353227400}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793353227794}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793353228355}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793353228558}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793353550420}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793353550962}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793355352926}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793355352934}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793357151028}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793357151409}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793357181076,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793357384139}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793357384657}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793357414509,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793357675614}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793357684966}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793357685433}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793357817049,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793359620414}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793359631004}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793359631539}
+{"level":"error","message":"Analytics SDK: TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106 {\"context\":\"AnalyticsSDKApiError\"}","timestamp":1793359736834,"stack":"TypeError: Failed to fetch\n    at globalThis.fetch (https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io/src/tracing.ts:194:55)\n    at _t (<anonymous>:1:64025)\n    at <anonymous>:1:68106"}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1793361539539}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793440094452}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793440095006}
+{"level":"debug","message":"[vite] connected.","timestamp":1793440192065}
+{"level":"warn","message":"Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.","timestamp":1793440193355}
+{"level":"error","message":"Origin https://ixqe7n3c8rx9j749f9zkz.preview.studio.arc.io not found on Allowlist - update configuration on cloud.reown.com","timestamp":1793440193721}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/RevenueCard.tsx","timestamp":1793440217178}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440217178}
+{"level":"debug","message":"[vite] hot updated: /src/pages/MerchantDashboard.tsx","timestamp":1793440225793}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440225793}
+{"level":"debug","message":"[vite] hot updated: /src/pages/MerchantDashboard.tsx","timestamp":1793440226784}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440226784}
+{"level":"debug","message":"[vite] hot updated: /src/pages/MerchantDashboard.tsx","timestamp":1793440227834}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440227834}
+{"level":"debug","message":"[vite] hot updated: /src/pages/MerchantDashboard.tsx","timestamp":1793440228520}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440228520}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/WithdrawModal.tsx","timestamp":1793440239145}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1793440239145}

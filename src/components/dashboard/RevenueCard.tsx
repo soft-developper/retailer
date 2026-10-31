@@ -1,39 +1,38 @@
 import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
-import { getUsdc } from '@/onchain-facts'
-import { Amount, usdcDecimalsFor } from '@/onchain-money'
 import { TokenUSDC } from '@web3icons/react'
-import { ArrowDownToLine } from 'lucide-react'
+import { ArrowDownToLine, ArrowUpRight } from 'lucide-react'
 import type { Merchant } from '../../lib/api'
 
-const ARC_TESTNET_CHAIN_ID = 5042002
+// Arc mainnet — same USDC address on both testnet and mainnet
+const ARC_CHAIN_ID = 5042
+const USDC_ADDRESS = '0x3600000000000000000000000000000000000000' as `0x${string}`
+const USDC_DECIMALS = 6
 
 interface Props {
   merchant: Merchant
   fxRate: number
   currency: string
   onTopUp?: () => void
+  onWithdraw?: () => void
 }
 
-export default function RevenueCard({ merchant, fxRate, currency, onTopUp }: Props) {
-  const usdcFact = getUsdc(ARC_TESTNET_CHAIN_ID)
-
+export default function RevenueCard({ merchant, fxRate, currency, onTopUp, onWithdraw }: Props) {
   const { data: rawBalance, isLoading } = useReadContract({
-    address: usdcFact?.address as `0x${string}`,
+    address: USDC_ADDRESS,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: [merchant.arc_wallet_address as `0x${string}`],
-    chainId: ARC_TESTNET_CHAIN_ID,
-    query: { enabled: !!usdcFact && !!merchant.arc_wallet_address, refetchInterval: 8000 },
+    chainId: ARC_CHAIN_ID,
+    query: { enabled: !!merchant.arc_wallet_address, refetchInterval: 8000 },
   })
 
-  const decimals = usdcDecimalsFor(ARC_TESTNET_CHAIN_ID)
-  const usdcAmount = rawBalance != null ? Amount.fromRaw(rawBalance, decimals) : null
-  const usdcFormatted = usdcAmount ? usdcAmount.toFixed(2) : '—'
+  const usdcAmount = rawBalance != null ? Number(rawBalance) / 10 ** USDC_DECIMALS : null
+  const usdcFormatted = usdcAmount != null ? usdcAmount.toFixed(2) : '—'
   const localFormatted =
-    usdcAmount && fxRate
+    usdcAmount != null && fxRate
       ? new Intl.NumberFormat('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
-          parseFloat(usdcAmount.toFixed(6)) / fxRate,
+          usdcAmount / fxRate,
         )
       : '—'
 
@@ -73,15 +72,26 @@ export default function RevenueCard({ merchant, fxRate, currency, onTopUp }: Pro
             ? `${merchant.arc_wallet_address.slice(0, 10)}…${merchant.arc_wallet_address.slice(-8)}`
             : 'Wallet address unavailable'}
         </p>
-        {onTopUp && (
-          <button
-            onClick={onTopUp}
-            className="flex items-center gap-1.5 flex-shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-          >
-            <ArrowDownToLine size={13} />
-            Top up
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {onWithdraw && (
+            <button
+              onClick={onWithdraw}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ArrowUpRight size={13} />
+              Withdraw
+            </button>
+          )}
+          {onTopUp && (
+            <button
+              onClick={onTopUp}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <ArrowDownToLine size={13} />
+              Top up
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

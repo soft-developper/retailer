@@ -10,6 +10,7 @@ import TransactionFeed from '../components/dashboard/TransactionFeed'
 import ProductList from '../components/dashboard/ProductList'
 import SkeletonCard from '../components/ui/SkeletonCard'
 import OnrampModal from '../components/dashboard/OnrampModal'
+import WithdrawModal from '../components/dashboard/WithdrawModal'
 
 export default function MerchantDashboard() {
   const navigate = useNavigate()
@@ -22,6 +23,7 @@ export default function MerchantDashboard() {
   const [loading, setLoading] = useState(true)
   const [txLoading, setTxLoading] = useState(true)
   const [showOnramp, setShowOnramp] = useState(false)
+  const [showWithdraw, setShowWithdraw] = useState(false)
 
   const loadMerchant = useCallback((): void => {
     void (async () => {
@@ -137,6 +139,7 @@ export default function MerchantDashboard() {
             fxRate={fxRate}
             currency={currency}
             onTopUp={() => setShowOnramp(true)}
+            onWithdraw={() => setShowWithdraw(true)}
           />
 
           {/* Stats */}
@@ -166,6 +169,14 @@ export default function MerchantDashboard() {
           merchantId={merchant.id}
           walletAddress={merchant.arc_wallet_address}
           onClose={() => setShowOnramp(false)}
+        />
+      )}
+
+      {showWithdraw && merchant.arc_wallet_address && (
+        <WithdrawModal
+          walletAddress={merchant.arc_wallet_address}
+          onClose={() => setShowWithdraw(false)}
+          onSuccess={() => { setShowWithdraw(false); loadTransactions() }}
         />
       )}
     </div>

@@ -136,6 +136,12 @@ export const api = {
   getFxRate: (currency: string) =>
     req<{ currency: string; usdRate: number }>('GET', `/fx/${currency}`),
 
+  // Wallet
+  getWalletBalance: () =>
+    req<{ balance: string; walletId: string }>('GET', '/wallet/balance'),
+  withdraw: (body: { destination_address: string; amount_usdc: number }) =>
+    req<{ ok: boolean; txHash?: string; txId: string; state: string; feeEstimate?: string; explorerUrl?: string }>('POST', '/withdraw', body),
+
   // Onramp
   createOnrampSession: (_merchant_id: string, destination_address: string) =>
     req<{ sessionId: string; sessionToken: string; expiresAt?: string; widgetUrl?: string }>(
